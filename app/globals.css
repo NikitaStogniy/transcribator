@@ -1,0 +1,250 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #000;
+  color: #fff;
+}
+
+.container {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+}
+
+h1,
+h2,
+h3 {
+  text-align: center;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+button {
+  background-color: #444;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  margin: 10px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #666;
+}
+
+.tabs {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.tablink {
+  border: none;
+  background: #333;
+  margin: 0 5px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+.tablink.active,
+.tablink:hover {
+  background: #555;
+}
+
+.tabcontent {
+  margin-top: 20px;
+  border-top: 1px solid #444;
+  padding-top: 20px;
+}
+
+/* Стили для транскрипции */
+.transcript {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #444;
+  line-height: 1.6;
+}
+
+.transcript .word {
+  padding: 2px;
+  cursor: pointer;
+}
+
+.transcript .word:hover {
+  background-color: #444;
+}
+
+.transcript .active {
+  background-color: #555;
+}
+
+.speaker-label {
+  color: #888;
+  font-size: 0.9em;
+  margin-top: 15px;
+  margin-bottom: 5px;
+}
+
+/* Стили для анализа тональности */
+.sentiment-analysis {
+  padding: 15px;
+}
+
+.sentiment {
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 5px;
+  border-left: 4px solid;
+}
+
+.sentiment.positive {
+  background-color: rgba(0, 255, 0, 0.1);
+  border-left-color: #4caf50;
+}
+
+.sentiment.negative {
+  background-color: rgba(255, 0, 0, 0.1);
+  border-left-color: #f44336;
+}
+
+.sentiment.neutral {
+  background-color: rgba(158, 158, 158, 0.1);
+  border-left-color: #9e9e9e;
+}
+
+.sentiment-label {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  margin-top: 5px;
+  background-color: #333;
+}
+
+/* Стили для категорий */
+.topics {
+  padding: 15px;
+}
+
+.topic-item {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+  gap: 10px;
+}
+
+.topic-name {
+  flex: 0 0 200px;
+}
+
+.confidence-bar {
+  flex: 1;
+  height: 20px;
+  background-color: #333;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.confidence-level {
+  height: 100%;
+  background-color: #4caf50;
+  transition: width 0.3s ease;
+}
+
+.confidence-value {
+  flex: 0 0 60px;
+  text-align: right;
+}
+
+/* Стили для сущностей */
+.entities {
+  padding: 15px;
+}
+
+.entity-item {
+  margin: 10px 0;
+  padding: 10px;
+  background-color: #222;
+  border-radius: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.entity-text {
+  flex: 1;
+}
+
+.entity-type {
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  background-color: #444;
+  margin-left: 10px;
+}
+
+/* Стили для краткого содержания */
+.summary {
+  padding: 15px;
+  line-height: 1.6;
+  background-color: #222;
+  border-radius: 5px;
+}
+
+/* Стили для аудиоплеера */
+.audio-container {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.audio-container.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Общие стили */
+audio {
+  width: 100%;
+  margin: 20px 0;
+}
+
+/* Адаптивность */
+@media (max-width: 600px) {
+  .tabs {
+    flex-direction: column;
+  }
+
+  .tablink {
+    margin: 5px 0;
+  }
+
+  .topic-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .topic-name {
+    flex: none;
+    margin-bottom: 5px;
+  }
+
+  .confidence-bar {
+    width: 100%;
+  }
+
+  .entity-item {
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .entity-type {
+    margin-left: 0;
+  }
+}
