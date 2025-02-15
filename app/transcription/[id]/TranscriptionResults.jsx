@@ -6,7 +6,7 @@ import SentimentAnalysis from "./components/SentimentAnalysis";
 import Topics from "./components/Topics";
 import Entities from "./components/Entities";
 
-export default function TranscriptionResults({ transcriptData, summary }) {
+export default function TranscriptionResults({ transcriptData, summaries }) {
   const [activeTab, setActiveTab] = useState("transcript");
   const transcriptContainerRef = useRef(null);
 
@@ -30,7 +30,7 @@ export default function TranscriptionResults({ transcriptData, summary }) {
 
   // Проверяем доступность каждой функции
   const hasTranscript = Boolean(transcriptData?.words?.length);
-  const hasSummary = Boolean(summary);
+  const hasSummary = Boolean(summaries?.length);
   const hasSentiment = Boolean(
     transcriptData?.sentiment_analysis_results?.length
   );
@@ -56,7 +56,24 @@ export default function TranscriptionResults({ transcriptData, summary }) {
           />
         );
       case "summary":
-        return <Summary summary={summary} />;
+        return (
+          <div className="space-y-4">
+            {summaries
+              .filter(
+                (summary) =>
+                  summary !== undefined && summary !== null && summary !== ""
+              )
+              .map((summary, index, filteredArray) => (
+                <div key={index} className="bg-white p-4 rounded-lg shadow">
+                  <h3 className="text-lg font-semibold mb-2">
+                    Резюме #{filteredArray.length - index}
+                  </h3>
+                  <Summary summary={summary} />
+                </div>
+              ))
+              .reverse()}
+          </div>
+        );
       case "sentiment":
         return (
           <SentimentAnalysis

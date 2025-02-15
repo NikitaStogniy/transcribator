@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import { createAssemblyClient, queryLeMur } from "./assemblyai";
 
 const TRANSCRIPTIONS_FILE = path.join(
   process.cwd(),
@@ -16,6 +17,7 @@ interface TranscriptionData {
   transcript?: any;
   summary?: string;
   summaryError?: string;
+  lemurResponse?: string;
 }
 
 // Хранилище транскрипций
@@ -46,6 +48,28 @@ export async function saveTranscriptions() {
 export async function getTranscription(id: string) {
   await loadTranscriptions();
   return transcriptions[id];
+}
+
+export async function queryTranscriptByLeMur(
+  query: string,
+  data: TranscriptionData
+) {
+  if (!data.transcript.id) {
+    console.log(data.transcript);
+    throw new Error("ID транскрипции не найден");
+  }
+
+  try {
+    const client = createAssemblyClient();
+    const response = await queryLeMur(client, data.transcript.id, query);
+    await updateTranscription(data.transcript.id, {
+      lemurResponse: response,
+    });
+    return response;
+  } catch (error) {
+    console.error("Ошибка при запросе к LeMUR:", (error as Error).message);
+    throw error;
+  }
 }
 
 // Сохранение данных транскрипции

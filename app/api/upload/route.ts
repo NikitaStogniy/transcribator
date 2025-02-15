@@ -1,10 +1,17 @@
-import { AssemblyAI, TranscribeParams } from "assemblyai";
+import { TranscribeParams, AssemblyAI } from "assemblyai";
 import path from "path";
 import { writeFile } from "fs/promises";
 import {
   saveTranscription,
   updateTranscription,
 } from "../../../lib/transcriptions";
+import {
+  createAssemblyClient,
+  uploadAudioFile,
+  createTranscription,
+  getTranscriptionStatus,
+  createSummaries,
+} from "../../../lib/assemblyai";
 
 export async function POST(req: Request) {
   try {
@@ -17,34 +24,32 @@ export async function POST(req: Request) {
       });
     }
 
-    const assemblyApiKey = process.env.ASSEMBLYAI_API_KEY;
-    if (!assemblyApiKey) {
-      throw new Error("API ключ AssemblyAI не настроен");
+    // Получаем дополнитильные параметры конфигурации из запроса (например, через поле "config")
+    const configField = formData.get("config");
+    let userConfig: Partial<TranscribeParams> = {};
+    if (configField && typeof configField === "string") {
+      try {
+        userConfig = JSON.parse(configField);
+      } catch (jsonError) {
+        console.error("Ошибка парсинга config:", (jsonError as Error).message);
+      }
     }
 
     // Инициализируем клиент AssemblyAI
-    const client = new AssemblyAI({
-      apiKey: assemblyApiKey,
-    });
+    const client = createAssemblyClient();
 
     // Загружаем файл в AssemblyAI
-    const uploadResponse = await client.files.upload(
+    const uploadResponse = await uploadAudioFile(
+      client,
       Buffer.from(await audioFile.arrayBuffer())
     );
 
-    // Запускаем транскрипцию с помощью SDK
-    const config: TranscribeParams = {
-      audio: uploadResponse,
-      language_code: "ru",
-      speaker_labels: true,
-      sentiment_analysis: false,
-      iab_categories: false,
-      entity_detection: true,
-      auto_highlights: false,
-    };
-
-    // Получаем ID транскрипции от AssemblyAI
-    const transcript = await client.transcripts.transcribe(config);
+    // Создаем транскрипцию
+    const transcript = await createTranscription(
+      client,
+      uploadResponse,
+      userConfig
+    );
     const transcriptId = transcript.id;
 
     // Сохраняем аудиофайл локально
@@ -86,7 +91,7 @@ async function startTranscription(transcriptId: string, client: AssemblyAI) {
     // Опрашиваем статус транскрипции
     let completed = false;
     while (!completed) {
-      const status = await client.transcripts.get(transcriptId);
+      const status = await getTranscriptionStatus(client, transcriptId);
       await updateTranscription(transcriptId, { status: status.status });
 
       if (status.status === "completed") {
@@ -95,25 +100,9 @@ async function startTranscription(transcriptId: string, client: AssemblyAI) {
           status: "completed",
         });
 
-        // Создаем краткое содержание с помощью LeMUR
-        try {
-          const { response } = await client.lemur.task({
-            transcript_ids: [transcriptId],
-            prompt:
-              "Предоставьте краткое содержание этой записи на русском языке. Включите основные темы, ключевые моменты и важные детали.",
-            final_model: "anthropic/claude-3-sonnet",
-          });
-
-          await updateTranscription(transcriptId, { summary: response });
-        } catch (summaryError) {
-          console.error(
-            "Ошибка при создании краткого содержания:",
-            (summaryError as Error).message
-          );
-          await updateTranscription(transcriptId, {
-            summaryError: "Не удалось создать краткое содержание",
-          });
-        }
+        // Создаем различные краткие содержания с помощью LeMUR
+        const { results, errors } = await createSummaries(client, transcriptId);
+        await updateTranscription(transcriptId, { ...results, ...errors });
 
         completed = true;
       } else if (status.status === "error") {
