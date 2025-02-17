@@ -65,6 +65,7 @@ export async function POST(req: Request) {
       audioUrl: blob.url,
       assemblyAudioUrl: uploadResponse,
       status: "processing",
+      lastUpdated: new Date().toISOString(),
     });
 
     // Асинхронно запускаем опрос статуса
@@ -89,28 +90,42 @@ async function startTranscription(transcriptId: string, client: AssemblyAI) {
     let completed = false;
     while (!completed) {
       const status = await getTranscriptionStatus(client, transcriptId);
-      await updateTranscription(transcriptId, { status: status.status });
+      await updateTranscription(transcriptId, {
+        status: status.status,
+        lastUpdated: new Date().toISOString(),
+      });
 
       if (status.status === "completed") {
         await updateTranscription(transcriptId, {
           transcript: status,
           status: "completed",
+          lastUpdated: new Date().toISOString(),
         });
 
         // Создаем различные краткие содержания с помощью LeMUR
         const { results, errors } = await createSummaries(client, transcriptId);
-        await updateTranscription(transcriptId, { ...results, ...errors });
+        await updateTranscription(transcriptId, {
+          ...results,
+          ...errors,
+          lastUpdated: new Date().toISOString(),
+        });
 
         completed = true;
       } else if (status.status === "error") {
-        await updateTranscription(transcriptId, { status: "error" });
+        await updateTranscription(transcriptId, {
+          status: "error",
+          lastUpdated: new Date().toISOString(),
+        });
         completed = true;
       } else {
         await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
   } catch (error) {
-    console.error("Ошибка при транскрипции:", (error as Error).message);
-    await updateTranscription(transcriptId, { status: "error" });
+    console.error("Ошибка при транскрипции:", error);
+    await updateTranscription(transcriptId, {
+      status: "error",
+      lastUpdated: new Date().toISOString(),
+    });
   }
 }
