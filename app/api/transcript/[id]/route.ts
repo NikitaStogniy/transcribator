@@ -1,7 +1,8 @@
 import { getTranscription } from "../../../../lib/transcriptions";
+import { NextRequest } from "next/server";
 
 export async function GET(
-  req: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
