@@ -4,12 +4,12 @@ import {
 } from "../../../../../lib/transcriptions";
 
 export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const id = (await params).id; // 'a', 'b', or 'c'
   try {
-    const { id } = params;
-    const body = await req.json();
+    const body = await request.json();
     const { query } = body;
 
     if (!query) {
