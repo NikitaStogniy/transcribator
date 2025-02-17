@@ -1,11 +1,12 @@
 import { generateSummaryIfNeeded } from "../../../../../lib/transcriptions";
 
+export const maxDuration = 60;
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const id = (await params).id;
     await generateSummaryIfNeeded(id);
 
     return new Response(JSON.stringify({ success: true }), {
