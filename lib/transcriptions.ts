@@ -1,4 +1,4 @@
-import { put, list, del } from "@vercel/blob";
+import { put, list } from "@vercel/blob";
 import { createAssemblyClient, queryLeMur } from "./assemblyai";
 
 // Интерфейс для данных транскрипции
