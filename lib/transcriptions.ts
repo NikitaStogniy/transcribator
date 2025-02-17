@@ -17,7 +17,7 @@ interface TranscriptionData {
 }
 
 // Хранилище транскрипций в памяти (кэш)
-let transcriptionsCache: Record<string, TranscriptionData> = {};
+const transcriptionsCache: Record<string, TranscriptionData> = {};
 
 const TRANSCRIPTIONS_DIR = "transcriptions";
 
