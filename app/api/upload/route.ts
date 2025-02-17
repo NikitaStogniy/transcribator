@@ -1,6 +1,5 @@
 import { TranscribeParams, AssemblyAI } from "assemblyai";
-import path from "path";
-import { writeFile } from "fs/promises";
+import { put } from "@vercel/blob";
 import {
   saveTranscription,
   updateTranscription,
@@ -54,20 +53,16 @@ export async function POST(req: Request) {
     );
     const transcriptId = transcript.id;
 
-    // Сохраняем аудиофайл локально
+    // Загружаем файл в Vercel Blob
     const fileExtension = audioFile.name.split(".").pop() || "mp3";
     const fileName = `${transcriptId}.${fileExtension}`;
-    const filePath = path.join(process.cwd(), "public", "uploads", fileName);
-    await writeFile(filePath, Buffer.from(await audioFile.arrayBuffer()));
-
-    // Публичный URL для аудио
-    const audioUrl = `/uploads/${fileName}`;
-
-    console.log("audioUrl", audioUrl);
+    const blob = await put(fileName, audioFile, {
+      access: "public",
+    });
 
     // Сохраняем начальные данные о транскрипции
     await saveTranscription(transcriptId, {
-      audioUrl,
+      audioUrl: blob.url,
       assemblyAudioUrl: uploadResponse,
       status: "processing",
     });
