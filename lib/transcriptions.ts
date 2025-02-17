@@ -14,7 +14,10 @@ interface TranscriptionData {
   assemblyAudioUrl: string;
   status: string;
   transcriptId?: string;
-  transcript?: any;
+  transcript?: {
+    id: string;
+    [key: string]: unknown;
+  };
   summary?: string;
   summaryError?: string;
   lemurResponse?: string;
@@ -29,8 +32,12 @@ export async function loadTranscriptions() {
     await fs.mkdir(path.dirname(TRANSCRIPTIONS_FILE), { recursive: true });
     const data = await fs.readFile(TRANSCRIPTIONS_FILE, "utf-8");
     transcriptions = JSON.parse(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Если файл не существует или пуст, создаем новый
+    console.error(
+      "Ошибка при загрузке транскрипций:",
+      error instanceof Error ? error.message : String(error)
+    );
     transcriptions = {};
     await saveTranscriptions();
   }
@@ -54,8 +61,7 @@ export async function queryTranscriptByLeMur(
   query: string,
   data: TranscriptionData
 ) {
-  if (!data.transcript.id) {
-    console.log(data.transcript);
+  if (!data.transcript?.id) {
     throw new Error("ID транскрипции не найден");
   }
 
@@ -66,8 +72,9 @@ export async function queryTranscriptByLeMur(
       lemurResponse: response,
     });
     return response;
-  } catch (error: any) {
-    console.error("Ошибка при запросе к LeMUR:", (error as Error).message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Ошибка при запросе к LeMUR:", errorMessage);
     throw error;
   }
 }

@@ -166,9 +166,12 @@ export async function createSummaries(
     try {
       const response = await queryLeMur(client, transcriptId, template.prompt);
       results[template.key] = response;
-    } catch (error: any) {
-      errors[`${template.key}Error`] =
-        "Не удалось создать резюме для данного шаблона";
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      errors[
+        `${template.key}Error`
+      ] = `Не удалось создать резюме для данного шаблона: ${errorMessage}`;
     }
   }
 
