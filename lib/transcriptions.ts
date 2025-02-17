@@ -1,12 +1,5 @@
-import fs from "fs/promises";
-import path from "path";
+import { put, list, del } from "@vercel/blob";
 import { createAssemblyClient, queryLeMur } from "./assemblyai";
-
-const TRANSCRIPTIONS_FILE = path.join(
-  process.cwd(),
-  "data",
-  "transcriptions.json"
-);
 
 // Интерфейс для данных транскрипции
 interface TranscriptionData {
@@ -23,38 +16,44 @@ interface TranscriptionData {
   lemurResponse?: string;
 }
 
-// Хранилище транскрипций
-export let transcriptions: Record<string, TranscriptionData> = {};
+// Хранилище транскрипций в памяти (кэш)
+let transcriptionsCache: Record<string, TranscriptionData> = {};
 
-// Загрузка данных при старте
+const BLOB_KEY = "transcriptions.json";
+
+// Загрузка данных из Blob storage
 export async function loadTranscriptions() {
   try {
-    await fs.mkdir(path.dirname(TRANSCRIPTIONS_FILE), { recursive: true });
-    const data = await fs.readFile(TRANSCRIPTIONS_FILE, "utf-8");
-    transcriptions = JSON.parse(data);
+    const { blobs } = await list();
+    const blob = blobs.find((b) => b.pathname === BLOB_KEY);
+    if (blob) {
+      const response = await fetch(blob.url);
+      const text = await response.text();
+      transcriptionsCache = JSON.parse(text);
+    } else {
+      transcriptionsCache = {};
+      await saveTranscriptions();
+    }
   } catch (error: unknown) {
-    // Если файл не существует или пуст, создаем новый
     console.error(
       "Ошибка при загрузке транскрипций:",
       error instanceof Error ? error.message : String(error)
     );
-    transcriptions = {};
+    transcriptionsCache = {};
     await saveTranscriptions();
   }
 }
 
-// Сохранение данных в файл
+// Сохранение данных в Blob storage
 export async function saveTranscriptions() {
-  await fs.writeFile(
-    TRANSCRIPTIONS_FILE,
-    JSON.stringify(transcriptions, null, 2)
-  );
+  const json = JSON.stringify(transcriptionsCache, null, 2);
+  await put(BLOB_KEY, json, { access: "public" });
 }
 
 // Получение данных транскрипции
 export async function getTranscription(id: string) {
   await loadTranscriptions();
-  return transcriptions[id];
+  return transcriptionsCache[id];
 }
 
 export async function queryTranscriptByLeMur(
@@ -81,7 +80,7 @@ export async function queryTranscriptByLeMur(
 
 // Сохранение данных транскрипции
 export async function saveTranscription(id: string, data: TranscriptionData) {
-  transcriptions[id] = data;
+  transcriptionsCache[id] = data;
   await saveTranscriptions();
 }
 
@@ -90,7 +89,7 @@ export async function updateTranscription(
   id: string,
   data: Partial<TranscriptionData>
 ) {
-  transcriptions[id] = { ...transcriptions[id], ...data };
+  transcriptionsCache[id] = { ...transcriptionsCache[id], ...data };
   await saveTranscriptions();
 }
 
