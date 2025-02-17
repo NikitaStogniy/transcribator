@@ -1,4 +1,4 @@
-import { put, list } from "@vercel/blob";
+import { put, list, del } from "@vercel/blob";
 import { createAssemblyClient, queryLeMur } from "./assemblyai";
 
 // Интерфейс для данных транскрипции
@@ -19,64 +19,83 @@ interface TranscriptionData {
 // Хранилище транскрипций в памяти (кэш)
 let transcriptionsCache: Record<string, TranscriptionData> = {};
 
-const BLOB_KEY = "transcriptions.json";
+const TRANSCRIPTIONS_DIR = "transcriptions";
+
+// Получение имени файла для транскрипции
+function getTranscriptionFileName(id: string) {
+  return `${TRANSCRIPTIONS_DIR}/${id}.json`;
+}
 
 // Загрузка данных из Blob storage
 export async function loadTranscriptions() {
   try {
     console.log("Начинаем загрузку транскрипций из Blob storage");
-    const { blobs } = await list();
+    const { blobs } = await list({ prefix: TRANSCRIPTIONS_DIR });
     console.log("Найдено блобов:", blobs.length);
-    const blob = blobs.find((b) => b.pathname === BLOB_KEY);
-    console.log("Поиск блоба с именем:", BLOB_KEY, "Найден:", !!blob);
 
-    if (blob) {
-      console.log("Загружаем данные из блоба:", blob.url);
-      const response = await fetch(blob.url);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    // Загружаем каждую транскрипцию отдельно
+    for (const blob of blobs) {
+      // Пропускаем не JSON файлы
+      if (!blob.pathname.endsWith(".json")) {
+        console.log("Пропускаем не JSON файл:", blob.pathname);
+        continue;
       }
-      const text = await response.text();
-      console.log("Получены данные размером:", text.length, "байт");
-      console.log("Содержимое блоба:", text.substring(0, 500) + "...");
-      const loadedData = JSON.parse(text);
-      // Слияние данных вместо перезаписи
-      transcriptionsCache = { ...loadedData, ...transcriptionsCache };
-      console.log(
-        "Данные успешно загружены в кэш. Количество транскрипций:",
-        Object.keys(transcriptionsCache).length,
-        "ID транскрипций:",
-        Object.keys(transcriptionsCache)
-      );
-    } else {
-      console.log("Блоб не найден, создаем пустой кэш");
-      if (Object.keys(transcriptionsCache).length === 0) {
-        await saveTranscriptions();
+
+      try {
+        console.log("Загружаем данные из блоба:", blob.url);
+        const response = await fetch(blob.url, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
+
+        if (!response.ok) {
+          console.error(`Ошибка загрузки ${blob.url}: ${response.status}`);
+          continue;
+        }
+
+        const text = await response.text();
+        const data = JSON.parse(text);
+        const id = blob.pathname.split("/").pop()?.replace(".json", "") || "";
+        transcriptionsCache[id] = data;
+      } catch (error) {
+        console.error(`Ошибка при загрузке ${blob.url}:`, error);
       }
     }
+
+    console.log(
+      "Данные успешно загружены в кэш. Количество транскрипций:",
+      Object.keys(transcriptionsCache).length,
+      "ID транскрипций:",
+      Object.keys(transcriptionsCache)
+    );
   } catch (error: unknown) {
     console.error(
       "Ошибка при загрузке транскрипций:",
       error instanceof Error ? error.message : String(error)
     );
     console.error("Полная ошибка:", error);
-    if (Object.keys(transcriptionsCache).length === 0) {
-      transcriptionsCache = {};
-      await saveTranscriptions();
-    }
   }
 }
 
-// Сохранение данных в Blob storage
-export async function saveTranscriptions() {
+// Сохранение данных транскрипции
+export async function saveTranscription(id: string, data: TranscriptionData) {
+  console.log("Сохраняем новую транскрипцию с ID:", id);
+  console.log("Текущее состояние кэша:", Object.keys(transcriptionsCache));
+  transcriptionsCache[id] = data;
+
   try {
-    console.log("Сохраняем транскрипции в Blob storage");
-    const json = JSON.stringify(transcriptionsCache, null, 2);
-    console.log("Размер данных для сохранения:", json.length, "байт");
-    await put(BLOB_KEY, json, { access: "public" });
-    console.log("Транскрипции успешно сохранены в Blob storage");
+    const json = JSON.stringify(data, null, 2);
+    const fileName = getTranscriptionFileName(id);
+    await put(fileName, json, {
+      access: "public",
+      addRandomSuffix: false,
+    });
+    console.log("Транскрипция успешно сохранена:", id);
   } catch (error) {
-    console.error("Ошибка при сохранении в Blob storage:", error);
+    console.error("Ошибка при сохранении транскрипции:", error);
     throw error;
   }
 }
@@ -84,10 +103,59 @@ export async function saveTranscriptions() {
 // Получение данных транскрипции
 export async function getTranscription(id: string) {
   console.log("Запрос транскрипции с ID:", id);
-  await loadTranscriptions();
-  const transcription = transcriptionsCache[id];
-  console.log("Найдена транскрипция:", !!transcription);
-  return transcription;
+
+  // Сначала проверяем кэш
+  if (transcriptionsCache[id]) {
+    console.log("Найдена транскрипция в кэше");
+    return transcriptionsCache[id];
+  }
+
+  // Если нет в кэше, пробуем загрузить из блоба
+  try {
+    const fileName = getTranscriptionFileName(id);
+    const { blobs } = await list({ prefix: fileName });
+    const blob = blobs[0];
+
+    if (blob) {
+      console.log("Загружаем транскрипцию из блоба:", blob.url);
+      const response = await fetch(blob.url, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      transcriptionsCache[id] = data;
+      console.log("Транскрипция успешно загружена");
+      return data;
+    }
+  } catch (error) {
+    console.error("Ошибка при загрузке транскрипции:", error);
+  }
+
+  console.log("Транскрипция не найдена");
+  return undefined;
+}
+
+// Обновление данных транскрипции
+export async function updateTranscription(
+  id: string,
+  data: Partial<TranscriptionData>
+) {
+  console.log("Обновляем транскрипцию с ID:", id);
+  const currentData = transcriptionsCache[id];
+  if (!currentData) {
+    throw new Error("Транскрипция не найдена в кэше");
+  }
+
+  const updatedData = { ...currentData, ...data };
+  await saveTranscription(id, updatedData);
 }
 
 export async function queryTranscriptByLeMur(
@@ -110,21 +178,6 @@ export async function queryTranscriptByLeMur(
     console.error("Ошибка при запросе к LeMUR:", errorMessage);
     throw error;
   }
-}
-
-// Сохранение данных транскрипции
-export async function saveTranscription(id: string, data: TranscriptionData) {
-  transcriptionsCache[id] = data;
-  await saveTranscriptions();
-}
-
-// Обновление данных транскрипции
-export async function updateTranscription(
-  id: string,
-  data: Partial<TranscriptionData>
-) {
-  transcriptionsCache[id] = { ...transcriptionsCache[id], ...data };
-  await saveTranscriptions();
 }
 
 // Инициализация при импорте
