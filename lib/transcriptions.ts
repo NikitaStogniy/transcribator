@@ -1,11 +1,16 @@
 import { put, list } from "@vercel/blob";
-import { createAssemblyClient, queryLeMur } from "./assemblyai";
+import {
+  createAssemblyClient,
+  queryLeMur,
+  createSummaries,
+} from "./assemblyai";
 
 // Интерфейс для данных транскрипции
 interface TranscriptionData {
   audioUrl: string;
   assemblyAudioUrl: string;
-  status: string;
+  status: "queued" | "processing" | "completed" | "error";
+  lastUpdated: string;
   transcriptId?: string;
   transcript?: {
     id: string;
@@ -101,46 +106,81 @@ export async function saveTranscription(id: string, data: TranscriptionData) {
 }
 
 // Получение данных транскрипции
-export async function getTranscription(id: string) {
+export async function getTranscription(
+  id: string
+): Promise<TranscriptionData | undefined> {
   console.log("Запрос транскрипции с ID:", id);
+
+  let transcriptionData: TranscriptionData | undefined;
 
   // Сначала проверяем кэш
   if (transcriptionsCache[id]) {
     console.log("Найдена транскрипция в кэше");
-    return transcriptionsCache[id];
-  }
+    transcriptionData = transcriptionsCache[id];
+  } else {
+    // Если нет в кэше, пробуем загрузить из блоба
+    try {
+      const fileName = getTranscriptionFileName(id);
+      const { blobs } = await list({ prefix: fileName });
+      const blob = blobs[0];
 
-  // Если нет в кэше, пробуем загрузить из блоба
-  try {
-    const fileName = getTranscriptionFileName(id);
-    const { blobs } = await list({ prefix: fileName });
-    const blob = blobs[0];
+      if (blob) {
+        console.log("Загружаем транскрипцию из блоба:", blob.url);
+        const response = await fetch(blob.url, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
 
-    if (blob) {
-      console.log("Загружаем транскрипцию из блоба:", blob.url);
-      const response = await fetch(blob.url, {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
-      });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        transcriptionData = data;
+        transcriptionsCache[id] = data;
+        console.log("Транскрипция успешно загружена");
       }
-
-      const data = await response.json();
-      transcriptionsCache[id] = data;
-      console.log("Транскрипция успешно загружена");
-      return data;
+    } catch (error) {
+      console.error("Ошибка при загрузке транскрипции:", error);
     }
-  } catch (error) {
-    console.error("Ошибка при загрузке транскрипции:", error);
   }
 
-  console.log("Транскрипция не найдена");
-  return undefined;
+  // Если транскрипция найдена и завершена, но нет краткого содержания
+  if (
+    transcriptionData &&
+    transcriptionData.status === "completed" &&
+    transcriptionData.transcript?.id &&
+    !transcriptionData.summary
+  ) {
+    try {
+      console.log(
+        "Запрашиваем краткое содержание для завершенной транскрипции"
+      );
+      const client = createAssemblyClient();
+      const { results, errors } = await createSummaries(
+        client,
+        transcriptionData.transcript.id
+      );
+
+      // Обновляем данные с кратким содержанием
+      const updatedData: TranscriptionData = {
+        ...transcriptionData,
+        ...results,
+        ...errors,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      await saveTranscription(id, updatedData);
+      transcriptionData = updatedData;
+    } catch (error) {
+      console.error("Ошибка при получении краткого содержания:", error);
+    }
+  }
+
+  return transcriptionData;
 }
 
 // Обновление данных транскрипции
@@ -154,15 +194,15 @@ export async function updateTranscription(
     throw new Error("Транскрипция не найдена в кэше");
   }
 
-  const updatedData = { ...currentData, ...data };
+  const updatedData: TranscriptionData = { ...currentData, ...data };
   await saveTranscription(id, updatedData);
 }
 
 export async function queryTranscriptByLeMur(
   query: string,
-  data: TranscriptionData
+  data: TranscriptionData | undefined
 ) {
-  if (!data.transcript?.id) {
+  if (!data?.transcript?.id) {
     throw new Error("ID транскрипции не найден");
   }
 
@@ -171,6 +211,7 @@ export async function queryTranscriptByLeMur(
     const response = await queryLeMur(client, data.transcript.id, query);
     await updateTranscription(data.transcript.id, {
       lemurResponse: response,
+      lastUpdated: new Date().toISOString(),
     });
     return response;
   } catch (error: unknown) {
