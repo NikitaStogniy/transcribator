@@ -155,9 +155,19 @@ export async function getTranscription(
     }
   }
 
-  // Если транскрипция найдена и завершена, но нет краткого содержания
+  return transcriptionData;
+}
+
+// Генерация краткого содержания для транскрипции
+export async function generateSummaryIfNeeded(id: string): Promise<void> {
+  const transcriptionData = transcriptionsCache[id];
+
+  if (!transcriptionData) {
+    throw new Error("Транскрипция не найдена в кэше");
+  }
+
+  // Проверяем, нужно ли генерировать краткое содержание
   if (
-    transcriptionData &&
     transcriptionData.status === "completed" &&
     transcriptionData.transcript?.id &&
     !transcriptionData.summary
@@ -173,21 +183,15 @@ export async function getTranscription(
       );
 
       // Обновляем данные с кратким содержанием
-      const updatedData: TranscriptionData = {
-        ...transcriptionData,
+      await updateTranscription(id, {
         ...results,
         ...errors,
         lastUpdated: new Date().toISOString(),
-      };
-
-      await saveTranscription(id, updatedData);
-      transcriptionData = updatedData;
+      });
     } catch (error) {
       console.error("Ошибка при получении краткого содержания:", error);
     }
   }
-
-  return transcriptionData;
 }
 
 // Обновление данных транскрипции

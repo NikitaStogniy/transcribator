@@ -48,6 +48,8 @@ export default function TranscriptionPage() {
   // Опрос статуса транскрипции
   useEffect(() => {
     if (!id) return;
+
+    let isFirstLoad = true;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/transcript/${id}`);
@@ -61,11 +63,30 @@ export default function TranscriptionPage() {
             ...data.transcript,
             audioUrl: data.audioUrl,
           });
-          // Устанавливаем суммаризацию из данных
-          setSummaries([data.summary_template1, data.lemurResponse] || []);
+
+          // Генерируем summary только при первой загрузке завершенной транскрипции
+          if (isFirstLoad && data.status === "completed") {
+            try {
+              await fetch(`/api/transcript/${id}/generate-summary`, {
+                method: "POST",
+              });
+              // Получаем обновленные данные с summary
+              const updatedRes = await fetch(`/api/transcript/${id}`);
+              const updatedData = await updatedRes.json();
+              setSummaries(
+                [updatedData.summary_template1, updatedData.lemurResponse] || []
+              );
+            } catch (error) {
+              console.error("Ошибка при генерации summary:", error);
+            }
+          } else {
+            setSummaries([data.summary_template1, data.lemurResponse] || []);
+          }
         }
       } catch (error) {
         console.error("Ошибка получения статуса транскрипции", error);
+      } finally {
+        isFirstLoad = false;
       }
     }, 3000);
 
