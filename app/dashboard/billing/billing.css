@@ -1,0 +1,159 @@
+:root {
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --background-color: #ffffff;
+  --card-background: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --border-color: #e5e7eb;
+  --available-bg: #eff6ff;
+  --used-bg: #f9fafb;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-color: #60a5fa;
+    --primary-hover: #3b82f6;
+    --background-color: #1f2937;
+    --card-background: #111827;
+    --text-primary: #f9fafb;
+    --text-secondary: #d1d5db;
+    --border-color: #374151;
+    --available-bg: rgba(59, 130, 246, 0.1);
+    --used-bg: rgba(75, 85, 99, 0.1);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.billing-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.billing-card {
+  background-color: var(--card-background);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+.billing-card h3 {
+  color: var(--text-primary);
+  font-size: 1.125rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+/* Balance Section */
+.balance-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+@media (min-width: 640px) {
+  .balance-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.balance-item {
+  padding: 1.25rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.balance-item.available {
+  background-color: var(--available-bg);
+}
+
+.balance-item.used {
+  background-color: var(--used-bg);
+}
+
+.balance-item dt {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.balance-item dd {
+  color: var(--text-primary);
+  font-size: 1.875rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+/* Purchase Section */
+.description {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.slider-container {
+  margin: 1.5rem 0;
+}
+
+.purchase-button {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.purchase-button:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+
+.purchase-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Rates Section */
+.rates-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.rate-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.rate-item:last-child {
+  border-bottom: none;
+}
+
+.rate-info h4 {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.rate-info p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.rate-price {
+  color: var(--text-primary);
+  font-size: 1.125rem;
+  font-weight: 500;
+}

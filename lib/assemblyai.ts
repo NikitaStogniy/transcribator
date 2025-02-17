@@ -7,14 +7,58 @@ export function createAssemblyClient() {
     throw new Error("API ключ AssemblyAI не настроен");
   }
 
-  return new AssemblyAI({
-    apiKey: assemblyApiKey,
-  });
+  try {
+    const client = new AssemblyAI({
+      apiKey: assemblyApiKey,
+    });
+
+    // Проверяем, что клиент создался корректно
+    if (!client || !client.transcripts) {
+      throw new Error("Не удалось инициализировать клиент AssemblyAI");
+    }
+
+    return client;
+  } catch (error) {
+    console.error("Ошибка при создании клиента AssemblyAI:", error);
+    throw new Error(
+      error instanceof Error
+        ? `Ошибка при создании клиента AssemblyAI: ${error.message}`
+        : "Неизвестная ошибка при создании клиента AssemblyAI"
+    );
+  }
 }
 
 // Загрузка файла в AssemblyAI
 export async function uploadAudioFile(client: AssemblyAI, audioBuffer: Buffer) {
-  return await client.files.upload(audioBuffer);
+  if (!client || !client.files) {
+    throw new Error("Некорректный клиент AssemblyAI");
+  }
+
+  if (!audioBuffer || audioBuffer.length === 0) {
+    throw new Error("Пустой аудио буфер");
+  }
+
+  try {
+    console.log(
+      "Starting file upload to AssemblyAI, buffer size:",
+      audioBuffer.length
+    );
+    const uploadUrl = await client.files.upload(audioBuffer);
+
+    if (!uploadUrl) {
+      throw new Error("Не удалось получить URL загруженного файла");
+    }
+
+    console.log("File uploaded successfully to:", uploadUrl);
+    return uploadUrl;
+  } catch (error) {
+    console.error("Ошибка при загрузке файла в AssemblyAI:", error);
+    throw new Error(
+      error instanceof Error
+        ? `Ошибка при загрузке файла: ${error.message}`
+        : "Неизвестная ошибка при загрузке файла"
+    );
+  }
 }
 
 // Создание транскрипции
@@ -62,7 +106,7 @@ export async function queryLeMur(
   const { response } = await client.lemur.task({
     transcript_ids: [transcriptId],
     prompt: prompt,
-    final_model: 'anthropic/claude-3-5-sonnet'
+    final_model: "anthropic/claude-3-5-sonnet",
   });
   return response;
 }

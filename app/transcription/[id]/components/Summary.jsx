@@ -10,6 +10,7 @@ const markdownStyles = {
   content: {
     borderTop: "1px solid #eee",
     paddingTop: "0.5rem",
+    whiteSpace: "pre-wrap",
   },
   markdown: {
     h1: {
@@ -27,27 +28,31 @@ const markdownStyles = {
     h3: {
       fontSize: "1.1rem",
       fontWeight: "bold",
-      marginBottom: "0.5rem",
-      marginTop: "0.5rem",
+      marginBottom: "1rem",
+      marginTop: "1rem",
+      display: "block",
     },
     p: {
-      marginBottom: "0.5rem",
+      marginBottom: "1rem",
+      display: "block",
+      whiteSpace: "pre-line",
     },
     ul: {
       listStyleType: "disc",
       paddingLeft: "1.5rem",
-      marginBottom: "0.5rem",
+      marginBottom: "1rem",
     },
     ol: {
       listStyleType: "decimal",
       paddingLeft: "1.5rem",
-      marginBottom: "0.5rem",
+      marginBottom: "1rem",
     },
     li: {
-      marginBottom: "0.25rem",
+      marginBottom: "0.5rem",
     },
     strong: {
       fontWeight: "bold",
+      display: "inline-block",
     },
     em: {
       fontStyle: "italic",
@@ -62,7 +67,7 @@ const markdownStyles = {
       borderLeft: "4px solid #e2e8f0",
       paddingLeft: "1rem",
       marginLeft: "0",
-      marginBottom: "0.5rem",
+      marginBottom: "1rem",
       fontStyle: "italic",
     },
   },
@@ -105,6 +110,13 @@ export default function Summary({ summary }) {
     });
   };
 
+  // Преобразуем текст, чтобы каждый элемент задачи начинался с новой строки
+  const formatSummaryText = (text) => {
+    return text
+      .replace(/\*\*([^:]+):\*\*/g, "\n**$1:**") // Добавляем перенос строки перед каждым новым элементом
+      .trim(); // Убираем лишние пробелы в начале и конце
+  };
+
   return (
     <div style={markdownStyles.container}>
       <div style={markdownStyles.header}>
@@ -117,7 +129,9 @@ export default function Summary({ summary }) {
       </div>
       <div style={markdownStyles.content}>
         <ReactMarkdown components={MarkdownComponents}>
-          {typeof summary === "string" ? summary : summary.text}
+          {formatSummaryText(
+            typeof summary === "string" ? summary : summary.text
+          )}
         </ReactMarkdown>
       </div>
     </div>

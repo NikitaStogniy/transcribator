@@ -8,6 +8,23 @@ const TRANSCRIPTIONS_FILE = path.join(
   "transcriptions.json"
 );
 
+// Интерфейс для данных автора
+interface Author {
+  name: string;
+  avatarUrl?: string;
+}
+
+// Поддерживаемые языки
+export const SUPPORTED_LANGUAGES = {
+  ru: "Русский",
+  en: "English",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+} as const;
+
+export type SupportedLanguage = keyof typeof SUPPORTED_LANGUAGES;
+
 // Интерфейс для данных транскрипции
 interface TranscriptionData {
   audioUrl: string;
@@ -18,6 +35,10 @@ interface TranscriptionData {
   summary?: string;
   summaryError?: string;
   lemurResponse?: string;
+  author?: Author;
+  language: SupportedLanguage;
+  participantsCount: number;
+  createdAt: string;
 }
 
 // Хранилище транскрипций

@@ -1,12 +1,37 @@
 :root {
+  /* Dark theme colors */
+  --bg-primary: #111827;
+  --bg-secondary: #1f2937;
+  --bg-tertiary: #374151;
+
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+
+  --border: #374151;
+  --border-light: #4b5563;
+
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --primary-light: rgba(59, 130, 246, 0.1);
+
+  --success: #10b981;
+  --success-light: rgba(16, 185, 129, 0.1);
+
+  --error: #ef4444;
+  --error-light: rgba(239, 68, 68, 0.1);
+
+  --warning: #f59e0b;
+  --warning-light: rgba(245, 158, 11, 0.1);
+
   --border-color: #808080;
   --border-radius: 8px;
   --background-color: #111111;
 }
 
 body {
-  background-color: var(--background-color);
-  color: #eee;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   font-family: Arial, sans-serif;
   margin: 0;
   padding: 0;

@@ -1,119 +1,219 @@
 import { TranscribeParams, AssemblyAI } from "assemblyai";
-import path from "path";
-import { writeFile } from "fs/promises";
+import { put } from "@vercel/blob";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import {
-  saveTranscription,
-  updateTranscription,
-} from "../../../lib/transcriptions";
-import {
-  createAssemblyClient,
-  uploadAudioFile,
   createTranscription,
-  getTranscriptionStatus,
-  createSummaries,
-} from "../../../lib/assemblyai";
+  updateTranscriptionStatus,
+  updateTranscriptionMetadata,
+} from "@/lib/db/transcriptions";
+import { createAssemblyClient, uploadAudioFile } from "@/lib/assemblyai";
+import { SupportedLanguage } from "@/lib/transcriptions";
 
 export async function POST(req: Request) {
   try {
-    const formData = await req.formData();
-    const audioFile = formData.get("audio") as File;
-
-    if (!audioFile) {
-      return new Response(JSON.stringify({ error: "Аудиофайл не найден" }), {
-        status: 400,
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
     }
 
-    // Получаем дополнитильные параметры конфигурации из запроса (например, через поле "config")
-    const configField = formData.get("config");
-    let userConfig: Partial<TranscribeParams> = {};
-    if (configField && typeof configField === "string") {
-      try {
-        userConfig = JSON.parse(configField);
-      } catch (jsonError) {
-        console.error("Ошибка парсинга config:", (jsonError as Error).message);
-      }
-    }
-
-    // Инициализируем клиент AssemblyAI
-    const client = createAssemblyClient();
-
-    // Загружаем файл в AssemblyAI
-    const uploadResponse = await uploadAudioFile(
-      client,
-      Buffer.from(await audioFile.arrayBuffer())
-    );
-
-    // Создаем транскрипцию
-    const transcript = await createTranscription(
-      client,
-      uploadResponse,
-      userConfig
-    );
-    const transcriptId = transcript.id;
-
-    // Сохраняем аудиофайл локально
-    const fileExtension = audioFile.name.split(".").pop() || "mp3";
-    const fileName = `${transcriptId}.${fileExtension}`;
-    const filePath = path.join(process.cwd(), "public", "uploads", fileName);
-    await writeFile(filePath, Buffer.from(await audioFile.arrayBuffer()));
-
-    // Публичный URL для аудио
-    const audioUrl = `/uploads/${fileName}`;
-
-    console.log("audioUrl", audioUrl);
-
-    // Сохраняем начальные данные о транскрипции
-    await saveTranscription(transcriptId, {
-      audioUrl,
-      assemblyAudioUrl: uploadResponse,
-      status: "processing",
+    const formData = await req.formData();
+    console.log("Received form data:", {
+      file: formData.get("file"),
+      language: formData.get("language"),
+      participantsCount: formData.get("participantsCount"),
     });
 
-    // Асинхронно запускаем опрос статуса
-    startTranscription(transcriptId, client);
+    const audioFile = formData.get("file") as File;
+    const language = formData.get("language") as SupportedLanguage;
+    const participantsCount =
+      parseInt(formData.get("participantsCount") as string) || 1;
 
-    return new Response(
-      JSON.stringify({ link: `/transcription/${transcriptId}` }),
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Ошибка в /api/upload:", (error as Error).message);
-    return new Response(
-      JSON.stringify({ error: "Ошибка загрузки или транскрипции" }),
-      { status: 500 }
-    );
-  }
-}
+    if (!audioFile) {
+      return new Response(JSON.stringify({ error: "Audio file not found" }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
 
-async function startTranscription(transcriptId: string, client: AssemblyAI) {
-  try {
-    // Опрашиваем статус транскрипции
-    let completed = false;
-    while (!completed) {
-      const status = await getTranscriptionStatus(client, transcriptId);
-      await updateTranscription(transcriptId, { status: status.status });
+    // Проверка размера файла (максимум 100MB)
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB в байтах
+    if (audioFile.size > MAX_FILE_SIZE) {
+      return new Response(
+        JSON.stringify({ error: "File size exceeds 100MB limit" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
-      if (status.status === "completed") {
-        await updateTranscription(transcriptId, {
-          transcript: status,
-          status: "completed",
-        });
+    // Проверка формата файла
+    const allowedTypes = [
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/wav",
+      "audio/x-m4a",
+      "audio/mp4",
+      "audio/aac",
+    ];
+    if (!allowedTypes.includes(audioFile.type)) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Unsupported file format. Please upload MP3, WAV, M4A, or AAC file",
+        }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
-        // Создаем различные краткие содержания с помощью LeMUR
-        const { results, errors } = await createSummaries(client, transcriptId);
-        await updateTranscription(transcriptId, { ...results, ...errors });
+    const transcriptionData = {
+      userId: session.user.id,
+      fileName: audioFile.name,
+      language,
+      participantsCount,
+      status: "uploading",
+      createdAt: new Date().toISOString(),
+    };
 
-        completed = true;
-      } else if (status.status === "error") {
-        await updateTranscription(transcriptId, { status: "error" });
-        completed = true;
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+    console.log("Creating DB record with:", transcriptionData);
+
+    // Создаем запись в БД
+    try {
+      const dbTranscription = await createTranscription(transcriptionData);
+      console.log("DB record created:", dbTranscription);
+
+      // Загружаем файл в blob storage
+      console.log("Uploading to blob storage...");
+      const blob = await put(
+        `transcriptions/${dbTranscription.id}/${audioFile.name}`,
+        audioFile,
+        {
+          access: "public",
+        }
+      );
+      console.log("Blob storage upload complete:", blob.url);
+
+      // Обновляем URL файла в БД
+      await updateTranscriptionMetadata(dbTranscription.id, {
+        audioUrl: blob.url,
+      });
+
+      // Создаем клиент AssemblyAI
+      console.log("Creating AssemblyAI client...");
+      const client = createAssemblyClient();
+
+      // Загружаем аудио в AssemblyAI
+      console.log("Converting file to buffer...");
+      const arrayBuffer = await audioFile.arrayBuffer();
+      console.log("Array buffer size:", arrayBuffer.byteLength);
+      const audioBuffer = Buffer.from(arrayBuffer);
+      console.log("Buffer size:", audioBuffer.length);
+
+      if (!audioBuffer || audioBuffer.length === 0) {
+        throw new Error("Failed to convert file to buffer");
       }
+
+      console.log("Uploading to AssemblyAI...");
+      const assemblyAudioUrl = await uploadAudioFile(client, audioBuffer);
+      console.log("AssemblyAI upload complete:", assemblyAudioUrl);
+
+      // Запускаем транскрибацию
+      const params: TranscribeParams = {
+        audio_url: assemblyAudioUrl,
+        language_code: language,
+        speaker_labels: participantsCount > 1,
+        speakers_expected: participantsCount,
+      };
+
+      console.log("Starting transcription with params:", params);
+
+      if (!params.audio_url) {
+        throw new Error("Audio URL is required for transcription");
+      }
+
+      try {
+        const transcript = await client.transcripts.create(params);
+        if (!transcript) {
+          throw new Error("Failed to create transcript: Response is null");
+        }
+        console.log("Transcription started:", transcript.id);
+        await updateTranscriptionStatus(
+          dbTranscription.id,
+          "processing",
+          transcript.id
+        );
+
+        return new Response(
+          JSON.stringify({
+            transcriptionId: dbTranscription.id,
+            status: "processing",
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      } catch (error) {
+        console.error("Error starting transcription:", error);
+        await updateTranscriptionStatus(dbTranscription.id, "error");
+
+        return new Response(
+          JSON.stringify({
+            error: "Failed to start transcription",
+            details: error instanceof Error ? error.message : "Unknown error",
+          }),
+          {
+            status: 500,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Error in database operation:", error);
+      return new Response(
+        JSON.stringify({
+          error: "Database operation failed",
+          details: error instanceof Error ? error.message : "Unknown error",
+        }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
     }
   } catch (error) {
-    console.error("Ошибка при транскрипции:", (error as Error).message);
-    await updateTranscription(transcriptId, { status: "error" });
+    console.error("Error in upload:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Failed to process upload",
+        details: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 }
