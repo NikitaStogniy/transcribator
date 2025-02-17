@@ -38,11 +38,20 @@ export async function loadTranscriptions() {
     const { blobs } = await list({ prefix: TRANSCRIPTIONS_DIR });
     console.log("Найдено блобов:", blobs.length);
 
-    // Загружаем каждую транскрипцию отдельно
-    for (const blob of blobs) {
-      // Пропускаем не JSON файлы
-      if (!blob.pathname.endsWith(".json")) {
-        console.log("Пропускаем не JSON файл:", blob.pathname);
+    // Фильтруем только JSON файлы из директории transcriptions/
+    const jsonBlobs = blobs.filter(
+      (blob) =>
+        blob.pathname.endsWith(".json") &&
+        blob.pathname.startsWith(`${TRANSCRIPTIONS_DIR}/`)
+    );
+
+    // Загружаем только те транскрипции, которых еще нет в кэше
+    for (const blob of jsonBlobs) {
+      const id = blob.pathname.split("/").pop()?.replace(".json", "") || "";
+
+      // Пропускаем, если уже есть в кэше
+      if (transcriptionsCache[id]) {
+        console.log("Пропускаем уже закэшированную транскрипцию:", id);
         continue;
       }
 
@@ -61,9 +70,7 @@ export async function loadTranscriptions() {
           continue;
         }
 
-        const text = await response.text();
-        const data = JSON.parse(text);
-        const id = blob.pathname.split("/").pop()?.replace(".json", "") || "";
+        const data = await response.json();
         transcriptionsCache[id] = data;
       } catch (error) {
         console.error(`Ошибка при загрузке ${blob.url}:`, error);
@@ -118,7 +125,7 @@ export async function getTranscription(
     console.log("Найдена транскрипция в кэше");
     transcriptionData = transcriptionsCache[id];
   } else {
-    // Если нет в кэше, пробуем загрузить из блоба
+    // Если нет в кэше, загружаем только конкретный файл
     try {
       const fileName = getTranscriptionFileName(id);
       const { blobs } = await list({ prefix: fileName });
