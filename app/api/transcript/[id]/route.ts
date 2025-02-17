@@ -1,12 +1,15 @@
 import { getTranscription } from "../../../../lib/transcriptions";
 import { NextRequest } from "next/server";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+type RouteContext = {
+  params: {
+    id: string;
+  };
+};
+
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     console.log("Запрошенный ID:", id);
 
     const data = await getTranscription(id);
