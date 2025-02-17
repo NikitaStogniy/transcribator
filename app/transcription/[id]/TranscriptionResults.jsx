@@ -42,8 +42,8 @@ export default function TranscriptionResults({ transcriptData, summaries }) {
     { id: "transcript", label: "Транскрипция", available: hasTranscript },
     { id: "summary", label: "Краткое содержание", available: hasSummary },
     { id: "sentiment", label: "Анализ тональности", available: hasSentiment },
-    { id: "topics", label: "Категории", available: hasTopics },
-    { id: "entities", label: "Сущности", available: hasEntities },
+    // { id: "topics", label: "Категории", available: hasTopics },
+    // { id: "entities", label: "Сущности", available: hasEntities },
   ];
 
   const renderActiveTab = () => {
