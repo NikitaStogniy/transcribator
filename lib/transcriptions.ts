@@ -29,7 +29,7 @@ export async function loadTranscriptions() {
     await fs.mkdir(path.dirname(TRANSCRIPTIONS_FILE), { recursive: true });
     const data = await fs.readFile(TRANSCRIPTIONS_FILE, "utf-8");
     transcriptions = JSON.parse(data);
-  } catch (error) {
+  } catch (error: any) {
     // Если файл не существует или пуст, создаем новый
     transcriptions = {};
     await saveTranscriptions();
@@ -66,7 +66,7 @@ export async function queryTranscriptByLeMur(
       lemurResponse: response,
     });
     return response;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Ошибка при запросе к LeMUR:", (error as Error).message);
     throw error;
   }
