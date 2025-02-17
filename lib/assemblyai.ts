@@ -171,7 +171,7 @@ export async function createSummaries(
         error instanceof Error ? error.message : String(error);
       errors[
         `${template.key}Error`
-      ] = `Не удалось создать резюме для данного шаблона: ${errorMessage}`;
+      ] = `Не удалось создать резюме для данного ышаблона: ${errorMessage}`;
     }
   }
 
