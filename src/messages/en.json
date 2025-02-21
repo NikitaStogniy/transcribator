@@ -1,0 +1,14 @@
+{
+  "auth": {
+    "signIn": {
+      "title": "Sign in to your account",
+      "email": "Email"
+    }
+  },
+  "layout": {
+    "title": "Transcriber",
+    "meta": {
+      "description": "Transcriber is a tool that allows you to transcribe audio and video files."
+    }
+  }
+}

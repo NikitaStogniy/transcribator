@@ -1,0 +1,5 @@
+---
+description: Rules about i18n
+globs: *.tsx
+---
+We use i18n for translations, so every piece of text shoul go over [ru.json](mdc:messages/ru.json) and [en.json](mdc:messages/en.json)

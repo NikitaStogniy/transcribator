@@ -1,15 +1,8 @@
-import { withAuth } from "next-auth/middleware";
+import createMiddleware from "next-intl/middleware";
+import { routing } from "@/src/i18n/routing";
 
-export default withAuth({
-  pages: {
-    signIn: "/auth/signin",
-  },
-});
+export default createMiddleware(routing);
 
 export const config = {
-  matcher: [
-    "/transcription/:path*",
-    "/api/transcript/:path*",
-    "/api/upload/:path*",
-  ],
+  matcher: ["/", "/(en|ru)/:path*"],
 };

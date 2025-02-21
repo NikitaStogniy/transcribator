@@ -1,0 +1,11 @@
+{
+  "Home": {
+    "title": "Welcome to Transcribator",
+    "description": "Your reliable assistant for audio and video transcription"
+  },
+  "hero": {
+    "title": "Transcribator: AI-Powered Audio Transcription",
+    "subtitle": "Transform audio into precise text with cutting-edge AI technology",
+    "cta": "Start Transcription"
+  }
+}

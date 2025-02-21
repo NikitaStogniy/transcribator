@@ -1,0 +1,5 @@
+---
+description: Rule for text component
+globs: *.tsx
+---
+Instead of <Text> use [ThemedText.tsx](mdc:src/shared/ui/ThemedText.tsx) and use it's props instead of styles
