@@ -1,7 +1,6 @@
 import { NextIntlClientProvider } from "next-intl";
 import { notFound } from "next/navigation";
-import { setRequestLocale } from "next-intl/server";
-import { locales } from "@/i18n";
+import { locales } from "@/i18n/routing";
 import LocalizedHtml from "@/components/LocalizedHtml";
 
 export function generateStaticParams() {
@@ -13,14 +12,14 @@ export default async function LocaleLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ locale: string }>;
+  params: { locale: string };
 }) {
-  const locale = (await params).locale;
+  const locale = params.locale;
   // Validate that the incoming `locale` parameter is valid
   if (!locales.includes(locale as any)) notFound();
 
   // Enable static rendering
-  setRequestLocale(locale);
+  // setRequestLocale(locale);  // Временно отключаем до решения проблемы
 
   // Load messages for the current locale
   let messages;

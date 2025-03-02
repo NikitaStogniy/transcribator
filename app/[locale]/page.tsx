@@ -4,14 +4,7 @@ import { useTranslations } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import LanguageSwitcher from "../../components/LanguageSwitcher";
 
-export default function Home({
-  params: { locale },
-}: {
-  params: { locale: string };
-}) {
-  // Enable static rendering
-  setRequestLocale(locale);
-
+export default function Home() {
   const t = useTranslations();
 
   return (

@@ -1,126 +1,130 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 
-// Mock data for files
-const files = [
-  {
-    id: "file-1",
-    name: "Meeting-2023-06-15.mp3",
-    type: "audio/mp3",
-    size: 24500000,
-    uploadedAt: "2023-06-15T14:30:00Z",
-    status: "completed",
-    uploadedBy: "user-1",
-    teamId: "team-1",
-  },
-  {
-    id: "file-2",
-    name: "ProductReview-2023-07-22.mp3",
-    type: "audio/mp3",
-    size: 32000000,
-    uploadedAt: "2023-07-22T10:15:00Z",
-    status: "completed",
-    uploadedBy: "user-2",
-    teamId: "team-1",
-  },
-  {
-    id: "file-3",
-    name: "WeeklySync-2023-08-05.mp3",
-    type: "audio/mp3",
-    size: 18000000,
-    uploadedAt: "2023-08-05T09:00:00Z",
-    status: "processing",
-    uploadedBy: "user-1",
-    teamId: "team-1",
-  },
-  {
-    id: "file-4",
-    name: "CustomerFeedback-2023-08-10.mp3",
-    type: "audio/mp3",
-    size: 27000000,
-    uploadedAt: "2023-08-10T15:45:00Z",
-    status: "pending",
-    uploadedBy: "user-3",
-    teamId: "team-1",
-  },
-  {
-    id: "file-5",
-    name: "StrategicPlanning-2023-08-18.mp3",
-    type: "audio/mp3",
-    size: 45000000,
-    uploadedAt: "2023-08-18T13:20:00Z",
-    status: "error",
-    uploadedBy: "user-2",
-    teamId: "team-1",
-  },
-  {
-    id: "file-6",
-    name: "Q3Review-2023-09-01.mp3",
-    type: "audio/mp3",
-    size: 36000000,
-    uploadedAt: "2023-09-01T11:30:00Z",
-    status: "pending",
-    uploadedBy: "user-1",
-    teamId: "team-2",
-  },
-  {
-    id: "file-7",
-    name: "MarketingBrainstorm-2023-09-10.mp3",
-    type: "audio/mp3",
-    size: 29000000,
-    uploadedAt: "2023-09-10T14:00:00Z",
-    status: "completed",
-    uploadedBy: "user-3",
-    teamId: "team-2",
-  },
-];
+// Validation schema for creating a file
+const createFileSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  type: z.string().optional(),
+  size: z.number().optional(),
+  teamId: z.string(),
+});
 
 export async function GET(request: Request) {
-  // Get teamId from the URL query parameters
-  const { searchParams } = new URL(request.url);
-  const teamId = searchParams.get("teamId");
-
-  // Filter files by teamId if provided
-  const filteredFiles = teamId
-    ? files.filter((file) => file.teamId === teamId)
-    : files;
-
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  return NextResponse.json(filteredFiles);
-}
-
-export async function POST(request: Request) {
-  // Handle file upload (mock)
   try {
-    const body = await request.json();
+    // Check authentication
+    const session = await auth();
 
-    // Validate the required fields
-    if (!body.name || !body.teamId) {
+    // Log the session for debugging
+    console.log("API /files session:", !!session?.user, session?.user?.id);
+
+    if (!session?.user) {
+      console.log("API /files: Unauthorized - no session user");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get parameters from the URL query
+    const { searchParams } = new URL(request.url);
+    const teamId = searchParams.get("teamId");
+
+    // Validate required parameters
+    if (!teamId) {
       return NextResponse.json(
-        { error: "Name and teamId are required" },
+        { error: "Team ID is required" },
         { status: 400 }
       );
     }
 
-    // Create a new file object
-    const newFile = {
-      id: `file-${files.length + 1}`,
-      name: body.name,
-      type: body.type || "audio/mp3",
-      size: body.size || 0,
-      uploadedAt: new Date().toISOString(),
-      status: "pending",
-      uploadedBy: body.uploadedBy || "user-1",
-      teamId: body.teamId,
-    };
+    // Check if user is member of the team
+    const teamMember = await prisma.teamMember.findFirst({
+      where: {
+        userId: session.user.id,
+        teamId,
+      },
+    });
 
-    // In a real app, we would save this to a database
-    // For the mock, we'll just return the new file
-    return NextResponse.json(newFile, { status: 201 });
+    if (!teamMember) {
+      return NextResponse.json(
+        { error: "You don't have access to this team" },
+        { status: 403 }
+      );
+    }
+
+    // Get files from database
+    const files = await prisma.file.findMany({
+      where: {
+        teamId,
+      },
+      orderBy: {
+        uploadedAt: "desc",
+      },
+    });
+
+    return NextResponse.json(files);
   } catch (error) {
+    console.error("Error fetching files:", error);
     return NextResponse.json(
-      { error: "Failed to process request" },
+      { error: "Failed to fetch files" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    // Check authentication
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Parse request body
+    const body = await request.json();
+
+    // Validate input
+    const result = createFileSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json(
+        { error: "Invalid input", details: result.error.format() },
+        { status: 400 }
+      );
+    }
+
+    const { name, type, size, teamId } = result.data;
+
+    // Check if user is member of the team
+    const teamMember = await prisma.teamMember.findFirst({
+      where: {
+        userId: session.user.id,
+        teamId,
+      },
+    });
+
+    if (!teamMember) {
+      return NextResponse.json(
+        { error: "You don't have access to this team" },
+        { status: 403 }
+      );
+    }
+
+    // Create file in database
+    const file = await prisma.file.create({
+      data: {
+        name,
+        type: type || "audio/mp3",
+        size: size || 0,
+        status: "pending",
+        teamId,
+        userId: session.user.id,
+      },
+    });
+
+    return NextResponse.json(file, { status: 201 });
+  } catch (error) {
+    console.error("Error creating file:", error);
+    return NextResponse.json(
+      { error: "Failed to create file" },
       { status: 500 }
     );
   }

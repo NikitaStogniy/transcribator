@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelectedTeam } from "./use-selected-team";
+import { get, post } from "@/lib/fetch-client";
 
 // Типы для файлов
 export type FileStatus = "pending" | "processing" | "completed" | "error";
@@ -19,37 +20,48 @@ export interface FileUpload {
   name: string;
   type?: string;
   size?: number;
-  teamId: string;
+  teamId?: string;
   uploadedBy?: string;
 }
 
 // Получение файлов из API
 const fetchFiles = async (teamId?: string): Promise<File[]> => {
-  const url = teamId ? `/api/files?teamId=${teamId}` : "/api/files";
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch files");
+  if (!teamId) {
+    return [];
   }
-
-  return response.json();
+  return get<File[]>("/api/files", { teamId });
 };
 
 // Загрузка файла в API
 const uploadFile = async (fileData: FileUpload): Promise<File> => {
-  const response = await fetch("/api/files", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(fileData),
+  // We need to use FormData for file uploads
+  const formData = new FormData();
+
+  // In a real implementation, this would be a real File object from an input
+  // For our mock implementation, we'll just create a text file
+  const mockFileContent = `This is a mock file for ${fileData.name}`;
+  const mockFile = new Blob([mockFileContent], {
+    type: fileData.type || "text/plain",
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to upload file");
+  formData.append("file", mockFile, fileData.name);
+
+  // Add teamId if provided
+  if (fileData.teamId) {
+    formData.append("teamId", fileData.teamId);
   }
 
-  return response.json();
+  // Make the request with FormData
+  return fetch("/api/files/upload", {
+    method: "POST",
+    body: formData,
+    credentials: "include",
+  }).then((response) => {
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+    return response.json();
+  });
 };
 
 // Хук для получения файлов

@@ -54,7 +54,8 @@ export default function FilesPage() {
       name: `Meeting-${new Date().toISOString().split("T")[0]}.mp3`,
       type: "audio/mp3",
       size: 25000000,
-      teamId: "team-1", // This would be the selected team
+      // We don't need to specify teamId anymore since the backend will use the user's default team
+      // The API will automatically use the user's default team
       uploadedBy: "user-1", // This would be the current user
     });
   };

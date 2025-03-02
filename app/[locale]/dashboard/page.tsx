@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+// import { setRequestLocale } from "next-intl/server";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export default function Dashboard() {

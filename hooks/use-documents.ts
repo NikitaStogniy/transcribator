@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTeamSelection } from "./use-team-selection";
+import { get, post } from "@/lib/fetch-client";
 
 export interface Document {
   id: string;
@@ -27,45 +28,21 @@ const fetchDocuments = async (
   teamId?: string,
   fileId?: string
 ): Promise<Document[]> => {
-  let url = "/api/documents";
-  const params = new URLSearchParams();
-
-  if (teamId) {
-    params.append("teamId", teamId);
+  if (!teamId) {
+    return [];
   }
 
+  const params: Record<string, string> = { teamId };
   if (fileId) {
-    params.append("fileId", fileId);
+    params.fileId = fileId;
   }
 
-  if (params.toString()) {
-    url += `?${params.toString()}`;
-  }
-
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch documents");
-  }
-
-  return response.json();
+  return get<Document[]>("/api/documents", params);
 };
 
 // Create a new document
 const createDocument = async (documentData: NewDocument): Promise<Document> => {
-  const response = await fetch("/api/documents", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(documentData),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to create document");
-  }
-
-  return response.json();
+  return post<Document>("/api/documents", documentData);
 };
 
 // Hook for fetching documents

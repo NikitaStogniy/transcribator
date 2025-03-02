@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelectedTeam } from "./use-selected-team";
+import { get, post } from "@/lib/fetch-client";
 
 // Типы для команды
 export type TeamRole = "admin" | "editor" | "viewer";
@@ -38,33 +39,17 @@ export interface NewTeamMember {
 
 // Получение данных команды из API
 const fetchTeamData = async (teamId?: string): Promise<TeamResponse> => {
-  const url = teamId ? `/api/team?teamId=${teamId}` : "/api/team";
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch team data");
+  if (!teamId) {
+    return { members: [] };
   }
-
-  return response.json();
+  return get<TeamResponse>("/api/team", { teamId });
 };
 
 // Добавление нового члена команды
 const addTeamMember = async (
   memberData: NewTeamMember
 ): Promise<TeamMember> => {
-  const response = await fetch("/api/team", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(memberData),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to add team member");
-  }
-
-  return response.json();
+  return post<TeamMember>("/api/team", memberData);
 };
 
 // Хук для получения данных команды

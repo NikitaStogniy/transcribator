@@ -10,6 +10,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -40,6 +42,31 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar();
   const t = useTranslations("UserNav");
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch("/api/auth/logout");
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(t("logoutSuccess"));
+
+        // Get the current locale from URL
+        const pathSegments = window.location.pathname.split("/");
+        const locale = pathSegments.length > 1 ? pathSegments[1] : "en";
+
+        // Redirect to login page with correct locale
+        window.location.href = `/${locale}/auth/login`;
+      } else {
+        toast.error(t("logoutError"));
+        console.error("Logout failed:", data.error);
+      }
+    } catch (error) {
+      toast.error(t("logoutError"));
+      console.error("Logout exception:", error);
+    }
+  };
 
   return (
     <SidebarMenu>
@@ -108,7 +135,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
               {t("logout")}
             </DropdownMenuItem>

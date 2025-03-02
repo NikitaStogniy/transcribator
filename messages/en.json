@@ -171,7 +171,9 @@
     "billing": "Billing",
     "notifications": "Notifications",
     "logout": "Log out",
-    "language": "Change language"
+    "language": "Change language",
+    "logoutSuccess": "Successfully logged out",
+    "logoutError": "Error during logout"
   },
   "Common": {
     "loading": "Loading...",
@@ -181,5 +183,34 @@
     "delete": "Delete",
     "edit": "Edit",
     "language": "Language"
+  },
+  "Auth": {
+    "register": {
+      "title": "Create an account",
+      "subtitle": "Enter your information to create an account",
+      "name": "Name",
+      "email": "Email",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "terms": "I agree to the terms and conditions",
+      "submit": "Register",
+      "alreadyHaveAccount": "Already have an account?",
+      "login": "Login",
+      "success": "Registration successful!",
+      "error": "Registration failed",
+      "passwordsMustMatch": "Passwords must match",
+      "passwordMinLength": "Password must be at least 8 characters",
+      "emailRequired": "Email is required",
+      "nameRequired": "Name is required",
+      "invalidEmail": "Invalid email address"
+    },
+    "login": {
+      "title": "Login",
+      "subtitle": "Enter your credentials to access your account",
+      "forgotPassword": "Forgot password?",
+      "submit": "Login",
+      "noAccount": "Don't have an account?",
+      "register": "Register"
+    }
   }
 }
