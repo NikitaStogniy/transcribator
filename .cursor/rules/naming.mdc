@@ -1,115 +1,130 @@
 ---
 description: Rules for names
-globs: *.ts, *.tsx
+globs: *.ts
 ---
-# Соглашение об именовании Recoil селекторов
+# Соглашение об именовании React Query хуков
 
 ## Обзор
-Документ описывает соглашение об именовании селекторов Recoil в нашем проекте. Следование этим правилам обеспечивает согласованность и ясность кодовой базы.
+Документ описывает соглашение об именовании хуков React Query в нашем проекте. Следование этим правилам обеспечивает согласованность и ясность кодовой базы.
 
 ## Шаблон именования
 ```typescript
-[действие][сущность][типДанных][характеристика][типСелектора]
+use[Действие][Сущность][Характеристика]
 ```
 
 ## Компоненты имени
 
-### 1. Действие (Обязательно)
-- `get` - для получения данных
-- `set` - для изменения данных
+### 1. Действие (Может отсутствовать)
+- Если хук просто получает данные, то действие можно опустить
+- Для хуков мутации обязательно указывать действие:
+  - `update` - обновление данных
+  - `add` - добавление данных
+  - `delete` - удаление данных
+  - `upload` - загрузка файлов
 
 ### 2. Сущность (Обязательно)
-Основная сущность, с которой работает селектор:
-- `User`
-- `Product`
-- `Order`
-- `Brand`
+Основная сущность, с которой работает хук:
+- `Files` - файлы
+- `Team` - команда
+- `User` - пользователь
+- `Transcription` - транскрипция
+- `Document` - документ
 
-### 3. Тип данных (Обязательно)
-Тип возвращаемых данных:
-- `List` - массив элементов
-- `Details` - детальная информация
-- `Count` - числовое значение
-- `Status` - информация о статусе
-
-### 4. Характеристика (Опционально)
+### 3. Характеристика (Опционально)
 Дополнительные спецификации:
-- `Filtered` - отфильтрованные данные
+- `ByStatus` - отфильтрованные по статусу
 - `ById` - по идентификатору
-- `ByCategory` - по категории
-
-### 5. Тип селектора (Обязательно)
-- `Selector` - синхронный селектор
-- `QuerySelector` - асинхронный селектор с API запросом
+- `SortedByDate` - отсортированные по дате
 
 ## Примеры
 
-### Синхронные селекторы
+### Хуки для получения данных
 ```typescript
-export const getUserDetailsSelector = selector({
-  key: 'getUserDetailsSelector',
-  get: ({get}) => {
-    // Синхронные операции
-  }
-});
+// Получение всех файлов
+export function useFiles() {
+  const { data: selectedTeamId } = useSelectedTeam();
 
-export const getProductFilteredCountSelector = selector({
-  key: 'getProductFilteredCountSelector',
-  get: ({get}) => {
-    // Синхронные операции
-  }
-});
+  return useQuery({
+    queryKey: ["files", selectedTeamId],
+    queryFn: () => fetchFiles(selectedTeamId),
+    enabled: !!selectedTeamId,
+  });
+}
+
+// Получение файлов по статусу
+export function useFilesByStatus() {
+  const { data: files = [] } = useFiles();
+
+  const filesByStatus = {
+    pending: files.filter((file) => file.status === "pending"),
+    processing: files.filter((file) => file.status === "processing"),
+    completed: files.filter((file) => file.status === "completed"),
+    error: files.filter((file) => file.status === "error"),
+    all: files,
+  };
+
+  return filesByStatus;
+}
 ```
 
-### Асинхронные селекторы
+### Хуки для изменения данных
 ```typescript
-export const getOrderListByStatusQuerySelector = selector({
-  key: 'getOrderListByStatusQuerySelector',
-  get: async ({get}) => {
-    // API запрос
-  }
-});
+// Загрузка файла
+export function useFileUpload() {
+  const queryClient = useQueryClient();
+  const { data: selectedTeamId } = useSelectedTeam();
 
-export const getBrandListFilteredQuerySelector = selector({
-  key: 'getBrandListFilteredQuerySelector',
-  get: async ({get}) => {
-    // API запрос
-  }
-});
+  return useMutation({
+    mutationFn: uploadFile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files", selectedTeamId] });
+    },
+  });
+}
+
+// Обновление транскрипции
+export function useUpdateTranscription() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: updateTranscription,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["transcription", data.id], data);
+      queryClient.invalidateQueries({ queryKey: ["transcriptions"] });
+    },
+  });
+}
 ```
 
 ## Правила
 
-1. Ключ селектора должен совпадать с названием переменной
-2. Префикс `get` обязателен для всех селекторов
-3. Суффикс `QuerySelector` используется только для асинхронных селекторов
-4. Суффикс `Selector` используется для синхронных селекторов
-5. Название должно чётко отражать тип возвращаемых данных*
+1. Все хуки начинаются с префикса `use`
+2. Для хуков получения данных можно опустить действие, если оно очевидно
+3. Для хуков мутации действие обязательно указывать
+4. Имя должно чётко отражать, с какими данными работает хук
+5. Хуки, возвращающие объекты с преобразованными данными, должны иметь характеристику в названии
 
 ## Примеры использования
 
 ```typescript
-// Продукты
-getProductListQuerySelector
-getProductDetailsByIdQuerySelector
-getProductFilteredCountSelector
-getProductCategoriesListSelector
+// Файлы
+useFiles()
+useFilesByStatus() 
+useFileUpload()
 
-// Пользователи
-getUserProfileQuerySelector
-getUserSettingsSelector
-getUserNotificationsListSelector
-getUserRoleSelector
+// Транскрипции
+useTranscriptions()
+useTranscription(id)
+useUpdateTranscription()
 
-// Заказы
-getOrderListByStatusQuerySelector
-getOrderTotalPriceSelector
-getOrderFilteredItemsSelector
-getOrderStatusSelector
+// Команды
+useTeam()
+useTeamMembersByRole()
+useAddTeamMember()
 ```
 
 ## Участие в разработке
-При добавлении новых селекторов следуйте этим соглашениям об именовании для поддержания согласованности кода. Если необходимо ввести новый паттерн именования, обсудите это с командой.
+При добавлении новых хуков следуйте этим соглашениям об именовании для поддержания согласованности кода. Если необходимо ввести новый паттерн именования, обсудите это с командой.
 
 ---
 По вопросам или предложениям по соглашению об именовании обращайтесь к тимлиду.

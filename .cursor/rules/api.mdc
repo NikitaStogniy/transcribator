@@ -1,6 +1,7 @@
 ---
 description: React query rules
 globs: *.ts
+alwaysApply: false
 ---
 # React Query Usage Rules
 
@@ -8,228 +9,128 @@ globs: *.ts
 
 The project uses React Query for managing API calls and caching with a unified approach. This document outlines the rules and best practices for working with React Query in the project.
 
-## 1. File Structure (FSD)
-
 ```
-entities/[entity]/api/
-├── [entity]Controller.ts     // API methods
-├── hooks.ts                  // React Query hooks
-├── types.ts                  // Types and interfaces
-└── index.ts                  // Re-exports
+app/
+├── api/                      // API routes
+├── (routes)/                 // App routes 
+│   └── products/
+│       ├── page.tsx
+│       ├── [id]/
+│       │   └── page.tsx
+│       └── _components/      // Route-specific components
+├── _components/              // Shared components
+└── _hooks/            red hooks
+    └── queries/              // React Query hooks
+        ├── products.ts       // Product-related queries
+        ├── users.ts          // User-related queries
+        └── ...
 ```
 
-## 2. Query Keys
-
-1. Use `QUERY_KEYS` from `queryKeys.ts`: [queryKeys.ts](mdc:src/shared/config/queryKeys.ts)
+## Организация Query Hooks
 
 ```typescript
-const { data } = useQuery(
-  QUERY_KEYS.GET_PRODUCTS_LIST({
-    categoryId,
-    sortBy,
-  })
-);
-```
+// app/_hooks/queries/products.ts
+import { QUERY_KEYS } from '@/lib/queryKeys';
 
-2. Keys are automatically sorted and filtered for undefined values
-3. Always use the exact key name from `QUERY_KEYS` object
-
-## 3. Hook Naming
-
-Follow pattern: `use[Method][Entity][Action?]`
-
-```typescript
-// GET
-useFetchProducts();
-useFetchProductDetails();
-
-// POST
-usePostProduct();
-
-// PUT
-usePutProduct();
-
-// DELETE
-useDeleteProduct();
-```
-
-## 4. Hook Implementation
-
-```typescript
-// hooks.ts
-export const useFetchProducts = (params: ProductsParams) => {
+export function useProducts(params?: ProductsParams) {
   return useQuery({
-    queryKey: QUERY_KEYS.GET_PRODUCTS_LIST(params),
-    queryFn: () => productsController.getProducts(params),
+    queryKey: QUERY_KEYS.PRODUCTS.LIST(params),
+    queryFn: () => fetchProducts(params),
   });
-};
+}
 
-export const usePostProduct = () => {
+export function useProductDetails(id: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.PRODUCTS.DETAIL(id),
+    queryFn: () => fetchProductById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateProduct() {
+  const queryClient = useQueryClient();
+  
   return useMutation({
-    mutationFn: (data: CreateProductDTO) =>
-      productsController.createProduct(data),
+    mutationFn: (data: CreateProductDTO) => createProduct(data),
     onSuccess: () => {
-      queryClient.invalidateQueries(QUERY_KEYS.GET_PRODUCTS_LIST());
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.PRODUCTS.LIST(),
+      });
     },
   });
+}
+```
+
+## API-функции
+
+```typescript
+// app/_hooks/queries/products.ts (продолжение)
+async function fetchProducts(params?: ProductsParams) {
+  const searchParams = new URLSearchParams();
+  if (params?.categoryId) searchParams.set('categoryId', params.categoryId);
+  if (params?.sortBy) searchParams.set('sortBy', params.sortBy);
+  
+  const response = await fetch(`/api/products?${searchParams.toString()}`);
+  if (!response.ok) throw new Error('Failed to fetch products');
+  return response.json();
+}
+
+async function fetchProductById(id: string) {
+  const response = await fetch(`/api/products/${id}`);
+  if (!response.ok) throw new Error('Failed to fetch product');
+  return response.json();
+}
+
+async function createProduct(data: CreateProductDTO) {
+  const response = await fetch('/api/products', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to create product');
+  return response.json();
+}
+```
+
+## Query Keys
+
+```typescript
+// lib/queryKeys.ts
+export const QUERY_KEYS = {
+  PRODUCTS: {
+    LIST: (params?: ProductsParams) => ['products', 'list', params].filter(Boolean),
+    DETAIL: (id?: string) => ['products', 'detail', id].filter(Boolean),
+  },
+  USERS: {
+    LIST: (params?: UsersParams) => ['users', 'list', params].filter(Boolean),
+    DETAIL: (id?: string) => ['users', 'detail', id].filter(Boolean),
+  },
 };
 ```
 
-## 5. Controller Implementation
+## Использование в компонентах
 
-```typescript
-// [entity]Controller.ts
-class ProductsController {
-  getProducts(params: ProductsParams) {
-    return apiService.get<ProductsResponse>({
-      url: '/products',
-      requestConfig: { params },
-    });
-  }
+```tsx
+// app/products/page.tsx
+'use client';
 
-  createProduct(data: CreateProductDTO) {
-    return apiService.post<Product>({
-      url: '/products',
-      requestConfig: { data },
-    });
-  }
-}
+import { useProducts } from '@/app/_hooks/queries/products';
 
-export const productsController = new ProductsController();
-```
-
-## 6. Type Safety
-
-```typescript
-// types.ts
-interface ProductsParams {
-  categoryId?: string;
-  sortBy?: string;
-}
-
-interface ProductsResponse {
-  data: Product[];
-  total: number;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  // ...
+export default function ProductsPage() {
+  const { data, isLoading, error } = useProducts();
+  
+  if (isLoading) return <div>Загрузка...</div>;
+  if (error) return <div>Ошибка: {error.message}</div>;
+  
+  return (
+    <div>
+      <h1>Продукты</h1>
+      <ul>
+        {data?.map(product => (
+          <li key={product.id}>{product.name}</li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 ```
-
-## 7. Best Practices
-
-1. Always handle loading and error states:
-
-```typescript
-const { data, isLoading, error } = useFetchProducts(params);
-```
-
-2. Use suspense mode only at page level:
-
-```typescript
-useQuery({
-  suspense: true, // Only in screen components
-  // ...
-});
-```
-
-3. Invalidate queries after mutations:
-
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries(QUERY_KEYS.GET_PRODUCTS_LIST());
-};
-```
-
-4. Use optimistic updates for better UX:
-
-```typescript
-useMutation({
-  onMutate: async (newProduct) => {
-    await queryClient.cancelQueries(QUERY_KEYS.GET_PRODUCTS_LIST());
-    const previousProducts = queryClient.getQueryData(
-      QUERY_KEYS.GET_PRODUCTS_LIST()
-    );
-    queryClient.setQueryData(QUERY_KEYS.GET_PRODUCTS_LIST(), (old) => [
-      ...old,
-      newProduct,
-    ]);
-    return { previousProducts };
-  },
-  onError: (err, newProduct, context) => {
-    queryClient.setQueryData(
-      QUERY_KEYS.GET_PRODUCTS_LIST(),
-      context.previousProducts
-    );
-  },
-});
-```
-
-5. Keep mutations in the same file as their related queries
-6. Export hooks from `index.ts`, never use controller directly in components
-7. Use `enabled` option for dependent queries:
-
-```typescript
-const { data: product } = useFetchProductDetails({
-  enabled: !!productId,
-  productId,
-});
-```
-
-## 8. Error Handling
-
-```typescript
-const { error } = useQuery({
-  retry: false, // Disable retries for 404s
-  onError: (error) => {
-    if (error.response?.status === 404) {
-      // Handle 404
-    }
-  },
-});
-```
-
-## 9. Imports
-
-```typescript
-// Correct
-import { useFetchProducts } from '@/entities/product';
-
-// Wrong
-import { productsController } from '@/entities/product/api/productsController';
-```
-
-## 10. Global Setup
-
-The project uses a global QueryClient configuration in `src/base/providers/QueryClientProvider.tsx` with these defaults:
-
-1. Retry behavior: Automatically retry failed queries
-2. Cache stale time & garbage collection settings
-3. Refetch triggers: Disabled on window focus, enabled on reconnect
-
-## 11. Query Key Generation
-
-The `src/shared/config/queryKeys.ts` provides two factory functions:
-
-1. `createQueryKey`: Generates query keys with optional params
-2. `createQueryKeys`: Creates a map of query key generators
-
-These ensure consistent cache management across the app.
-
-## 12. API Service Integration
-
-The project uses a custom `apiService` wrapper around Axios (`src/shared/api/api-services/apiService.ts`):
-
-1. Unified instance with base URL from environment variables
-2. Common methods: get, post, put, patch, delete
-3. Optional interceptors for request/response handling
-4. Type-safe request/response handling
-
-## Sources
-
-- Project Codebase
-- React Query Documentation
-- Axios Documentation
