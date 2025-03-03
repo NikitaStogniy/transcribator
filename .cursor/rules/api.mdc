@@ -1,7 +1,6 @@
 ---
 description: React query rules
 globs: *.ts
-alwaysApply: false
 ---
 # React Query Usage Rules
 
@@ -12,50 +11,39 @@ The project uses React Query for managing API calls and caching with a unified a
 ```
 app/
 ├── api/                      // API routes
-├── (routes)/                 // App routes 
-│   └── products/
-│       ├── page.tsx
-│       ├── [id]/
-│       │   └── page.tsx
-│       └── _components/      // Route-specific components
-├── _components/              // Shared components
-└── _hooks/            red hooks
-    └── queries/              // React Query hooks
-        ├── products.ts       // Product-related queries
-        ├── users.ts          // User-related queries
-        └── ...
+├── dashboard/                // App routes 
+│   └── files/
+│       └── page.tsx
+├── components/               // Shared components
+└── hooks/                    // React Query hooks
+    ├── use-files.ts          // File-related queries
+    ├── use-team.ts           // Team-related queries
+    ├── use-transcriptions.ts // Transcription-related queries
+    └── ...
 ```
 
 ## Организация Query Hooks
 
 ```typescript
-// app/_hooks/queries/products.ts
-import { QUERY_KEYS } from '@/lib/queryKeys';
+// hooks/use-files.ts
+export function useFiles() {
+  const { data: selectedTeamId } = useSelectedTeam();
 
-export function useProducts(params?: ProductsParams) {
   return useQuery({
-    queryKey: QUERY_KEYS.PRODUCTS.LIST(params),
-    queryFn: () => fetchProducts(params),
+    queryKey: ["files", selectedTeamId],
+    queryFn: () => fetchFiles(selectedTeamId),
+    enabled: !!selectedTeamId,
   });
 }
 
-export function useProductDetails(id: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.PRODUCTS.DETAIL(id),
-    queryFn: () => fetchProductById(id),
-    enabled: !!id,
-  });
-}
-
-export function useCreateProduct() {
+export function useFileUpload() {
   const queryClient = useQueryClient();
-  
+  const { data: selectedTeamId } = useSelectedTeam();
+
   return useMutation({
-    mutationFn: (data: CreateProductDTO) => createProduct(data),
+    mutationFn: uploadFile,
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.PRODUCTS.LIST(),
-      });
+      queryClient.invalidateQueries({ queryKey: ["files", selectedTeamId] });
     },
   });
 }
@@ -64,73 +52,109 @@ export function useCreateProduct() {
 ## API-функции
 
 ```typescript
-// app/_hooks/queries/products.ts (продолжение)
-async function fetchProducts(params?: ProductsParams) {
-  const searchParams = new URLSearchParams();
-  if (params?.categoryId) searchParams.set('categoryId', params.categoryId);
-  if (params?.sortBy) searchParams.set('sortBy', params.sortBy);
-  
-  const response = await fetch(`/api/products?${searchParams.toString()}`);
-  if (!response.ok) throw new Error('Failed to fetch products');
-  return response.json();
-}
+// hooks/use-files.ts (продолжение)
+const fetchFiles = async (teamId?: string): Promise<File[]> => {
+  const url = teamId ? `/api/files?teamId=${teamId}` : "/api/files";
+  const response = await fetch(url);
 
-async function fetchProductById(id: string) {
-  const response = await fetch(`/api/products/${id}`);
-  if (!response.ok) throw new Error('Failed to fetch product');
-  return response.json();
-}
+  if (!response.ok) {
+    throw new Error("Failed to fetch files");
+  }
 
-async function createProduct(data: CreateProductDTO) {
-  const response = await fetch('/api/products', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+  return response.json();
+};
+
+const uploadFile = async (fileData: FileUpload): Promise<File> => {
+  const response = await fetch("/api/files", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(fileData),
   });
-  if (!response.ok) throw new Error('Failed to create product');
+
+  if (!response.ok) {
+    throw new Error("Failed to upload file");
+  }
+
   return response.json();
-}
+};
 ```
 
 ## Query Keys
 
+Для проекта мы используем простую структуру ключей:
+
 ```typescript
-// lib/queryKeys.ts
-export const QUERY_KEYS = {
-  PRODUCTS: {
-    LIST: (params?: ProductsParams) => ['products', 'list', params].filter(Boolean),
-    DETAIL: (id?: string) => ['products', 'detail', id].filter(Boolean),
-  },
-  USERS: {
-    LIST: (params?: UsersParams) => ['users', 'list', params].filter(Boolean),
-    DETAIL: (id?: string) => ['users', 'detail', id].filter(Boolean),
-  },
-};
+// Примеры ключей запросов
+["files", teamId]               // Список файлов для команды
+["file", fileId]                // Конкретный файл
+["team", teamId]                // Данные команды
+["transcriptions", teamId]      // Транскрипции для команды
+["transcription", id]           // Конкретная транскрипция
+["selectedTeam"]                // Выбранная команда
 ```
 
 ## Использование в компонентах
 
 ```tsx
-// app/products/page.tsx
+// app/dashboard/files/page.tsx
 'use client';
 
-import { useProducts } from '@/app/_hooks/queries/products';
+import { useFiles, useFilesByStatus, useFileUpload } from "@/hooks/use-files";
 
-export default function ProductsPage() {
-  const { data, isLoading, error } = useProducts();
+export default function FilesPage() {
+  const { isLoading, error } = useFiles();
+  const filesByStatus = useFilesByStatus();
   
-  if (isLoading) return <div>Загрузка...</div>;
-  if (error) return <div>Ошибка: {error.message}</div>;
+  if (isLoading) return <div>Loading files...</div>;
+  if (error) return <div>Error loading files: {(error as Error).message}</div>;
   
   return (
     <div>
-      <h1>Продукты</h1>
-      <ul>
-        {data?.map(product => (
-          <li key={product.id}>{product.name}</li>
-        ))}
-      </ul>
+      <h1>Files</h1>
+      <p>Total files: {filesByStatus.all.length}</p>
+      {/* ... */}
     </div>
   );
 }
+```
+
+## Правила именования хуков
+
+Следуйте паттерну: `use[Сущность]` или `use[Действие][Сущность]`
+
+```typescript
+// Получение данных
+useFiles();
+useTeam();
+useTranscription(id);
+
+// Изменение данных
+useFileUpload();
+useUpdateTranscription();
+useAddTeamMember();
+```
+
+## Лучшие практики
+
+1. Всегда обрабатывайте состояния загрузки и ошибки:
+
+```typescript
+const { data, isLoading, error } = useFiles();
+
+if (isLoading) return <div>Loading...</div>;
+if (error) return <div>Error: {(error as Error).message}</div>;
+```
+
+2. Используйте кэш для оптимизации запросов:
+
+```typescript
+const queryClient = useQueryClient();
+
+// Обновление кэша после мутации
+queryClient.invalidateQueries({ queryKey: ["files", selectedTeamId] });
+
+// Прямое изменение кэша
+queryClient.setQueryData(["transcription", data.id], data);
 ```
