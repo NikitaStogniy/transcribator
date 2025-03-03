@@ -3,31 +3,93 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
-// Define permission types
+// Определяем типы ролей и разрешений
 export type Permission = {
   id: string;
   name: string;
   description: string;
-  module: string;
 };
 
-export type RolePermission = {
+export type Role = {
   id: string;
   name: string;
   description: string;
   permissions: Permission[];
 };
 
-// Validation schema for updating role permissions
-const updateRolePermissionsSchema = z.object({
-  roleId: z.string(),
-  permissionIds: z.array(z.string()),
-});
+// Маппинг ролей пользователей из TeamMember.role
+const ROLES = {
+  admin: {
+    id: "admin",
+    name: "Администратор",
+    description: "Полный доступ ко всем функциям и возможностям",
+  },
+  editor: {
+    id: "editor",
+    name: "Редактор",
+    description: "Может редактировать и создавать контент",
+  },
+  viewer: {
+    id: "viewer",
+    name: "Пользователь",
+    description: "Только просмотр контента",
+  },
+};
 
-// GET handler for fetching all permissions
+// Предопределенные разрешения для каждой роли
+const PERMISSIONS = {
+  admin: [
+    {
+      id: "files_manage",
+      name: "Управление файлами",
+      description: "Загрузка, удаление и управление файлами",
+    },
+    {
+      id: "team_manage",
+      name: "Управление командой",
+      description: "Добавление и удаление участников команды",
+    },
+    {
+      id: "docs_manage",
+      name: "Управление документами",
+      description: "Создание, редактирование и удаление документов",
+    },
+    {
+      id: "settings_manage",
+      name: "Управление настройками",
+      description: "Изменение настроек системы",
+    },
+  ],
+  editor: [
+    {
+      id: "files_upload",
+      name: "Загрузка файлов",
+      description: "Загрузка новых файлов",
+    },
+    {
+      id: "docs_edit",
+      name: "Редактирование документов",
+      description: "Создание и редактирование документов",
+    },
+  ],
+  viewer: [
+    {
+      id: "files_view",
+      name: "Просмотр файлов",
+      description: "Просмотр файлов",
+    },
+    {
+      id: "docs_view",
+      name: "Просмотр документов",
+      description: "Просмотр документов",
+    },
+  ],
+};
+
+// GET-обработчик для получения всех разрешений
 export async function GET(request: Request) {
   try {
-    // Check authentication
+    // Проверяем аутентификацию
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,69 +98,37 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const roleId = searchParams.get("roleId");
 
-    if (roleId) {
-      // Get specific role with its permissions
-      const role = await prisma.role.findUnique({
-        where: {
-          id: roleId,
-        },
-        include: {
-          permissions: {
-            include: {
-              permission: true,
-            },
-          },
-        },
-      });
+    if (roleId && ROLES[roleId as keyof typeof ROLES]) {
+      // Получаем информацию о конкретной роли
+      const role = ROLES[roleId as keyof typeof ROLES];
+      const permissions = PERMISSIONS[roleId as keyof typeof PERMISSIONS] || [];
 
-      if (!role) {
-        return NextResponse.json({ error: "Role not found" }, { status: 404 });
-      }
-
-      // Format the response
+      // Форматируем ответ
       return NextResponse.json({
         id: role.id,
         name: role.name,
         description: role.description,
-        permissions: role.permissions.map((rp: any) => ({
-          id: rp.permission.id,
-          name: rp.permission.name,
-          description: rp.permission.description,
-          module: rp.permission.module,
-        })),
+        permissions,
       });
     }
 
-    // Get all permissions and roles
-    const [permissions, roles] = await Promise.all([
-      prisma.permission.findMany(),
-      prisma.role.findMany({
-        include: {
-          permissions: {
-            include: {
-              permission: true,
-            },
-          },
-        },
-      }),
-    ]);
-
-    // Format the roles response
-    const formattedRoles = roles.map((role: any) => ({
-      id: role.id,
+    // Получаем все роли и разрешения
+    const roles = Object.entries(ROLES).map(([id, role]) => ({
+      id,
       name: role.name,
       description: role.description,
-      permissions: role.permissions.map((rp: any) => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.module,
-      })),
+      permissions: PERMISSIONS[id as keyof typeof PERMISSIONS] || [],
     }));
 
+    // Собираем все уникальные разрешения
+    const allPermissions = Object.values(PERMISSIONS).flat();
+    const uniquePermissions = [
+      ...new Map(allPermissions.map((p) => [p.id, p])).values(),
+    ];
+
     return NextResponse.json({
-      permissions,
-      roles: formattedRoles,
+      permissions: uniquePermissions,
+      roles,
     });
   } catch (error) {
     console.error("Error fetching permissions:", error);
@@ -109,20 +139,27 @@ export async function GET(request: Request) {
   }
 }
 
-// PATCH handler for updating role permissions
+// Схема для обновления роли пользователя
+const updateUserRoleSchema = z.object({
+  userId: z.string(),
+  teamId: z.string(),
+  role: z.enum(["admin", "editor", "viewer"]),
+});
+
+// PATCH-обработчик для обновления роли пользователя
 export async function PATCH(request: Request) {
   try {
-    // Check authentication
+    // Проверяем аутентификацию
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Parse request body
+    // Разбираем тело запроса
     const body = await request.json();
 
-    // Validate input
-    const result = updateRolePermissionsSchema.safeParse(body);
+    // Валидируем ввод
+    const result = updateUserRoleSchema.safeParse(body);
     if (!result.success) {
       return NextResponse.json(
         { error: "Invalid input", details: result.error.format() },
@@ -130,86 +167,73 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const { roleId, permissionIds } = result.data;
+    const { userId, teamId, role } = result.data;
 
-    // Check if user has admin permissions
-    const userRole = await prisma.teamMember.findFirst({
+    // Проверяем, является ли текущий пользователь администратором команды
+    const currentUserTeamMember = await prisma.teamMember.findFirst({
       where: {
         userId: session.user.id,
+        teamId,
         role: "admin",
       },
     });
 
-    if (!userRole) {
+    if (!currentUserTeamMember) {
       return NextResponse.json(
-        { error: "You don't have permission to update role permissions" },
+        { error: "You don't have permission to update user roles" },
         { status: 403 }
       );
     }
 
-    // Check if role exists
-    const role = await prisma.role.findUnique({
+    // Проверяем, существует ли пользователь в команде
+    const teamMember = await prisma.teamMember.findFirst({
       where: {
-        id: roleId,
+        userId,
+        teamId,
       },
     });
 
-    if (!role) {
-      return NextResponse.json({ error: "Role not found" }, { status: 404 });
+    if (!teamMember) {
+      return NextResponse.json(
+        { error: "User is not a member of this team" },
+        { status: 404 }
+      );
     }
 
-    // Perform the update in a transaction
-    await prisma.$transaction(async (tx) => {
-      // Delete existing role permissions
-      await tx.rolePermission.deleteMany({
-        where: {
-          roleId,
-        },
-      });
-
-      // Create new role permissions
-      await Promise.all(
-        permissionIds.map((permissionId) =>
-          tx.rolePermission.create({
-            data: {
-              roleId,
-              permissionId,
-            },
-          })
-        )
-      );
-    });
-
-    // Get updated role with permissions
-    const updatedRole = await prisma.role.findUnique({
+    // Обновляем роль пользователя
+    const updatedTeamMember = await prisma.teamMember.update({
       where: {
-        id: roleId,
+        id: teamMember.id,
+      },
+      data: {
+        role,
       },
       include: {
-        permissions: {
-          include: {
-            permission: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
           },
         },
       },
     });
 
-    // Format the response
+    // Форматируем ответ
     return NextResponse.json({
-      id: updatedRole?.id,
-      name: updatedRole?.name,
-      description: updatedRole?.description,
-      permissions: updatedRole?.permissions.map((rp: any) => ({
-        id: rp.permission.id,
-        name: rp.permission.name,
-        description: rp.permission.description,
-        module: rp.permission.module,
-      })),
+      id: updatedTeamMember.id,
+      userId: updatedTeamMember.userId,
+      teamId: updatedTeamMember.teamId,
+      role: updatedTeamMember.role,
+      user: updatedTeamMember.user,
+      permissions:
+        PERMISSIONS[updatedTeamMember.role as keyof typeof PERMISSIONS] || [],
     });
   } catch (error) {
-    console.error("Error updating permissions:", error);
+    console.error("Error updating user role:", error);
     return NextResponse.json(
-      { error: "Failed to update permissions" },
+      { error: "Failed to update user role" },
       { status: 500 }
     );
   }

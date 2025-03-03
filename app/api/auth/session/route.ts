@@ -11,7 +11,7 @@ export async function GET() {
       authenticated: !!session?.user,
       userId: session?.user?.id,
       userName: session?.user?.name,
-      userEmail: session?.user?.email?.split("@")[0] + "@***",
+      userEmail: session?.user?.email,
     });
   } catch (error) {
     console.error("Error in session debug API:", error);

@@ -3,8 +3,7 @@
 import { useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useSetSelectedTeam } from "@/hooks/use-selected-team";
-import { useFiles, useFilesByStatus, useFileUpload } from "@/hooks/use-files";
+import { useFiles, useFilesByStatus } from "@/hooks/use-files";
 import {
   Card,
   CardContent,
@@ -23,42 +22,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  FileUp,
-  File,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  UploadCloud,
-} from "lucide-react";
+import { File, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { AudioUploadButton } from "@/components/audio-upload";
 
 export default function FilesPage() {
   const t = useTranslations();
 
-  // Set a default selected team ID (in a real app, this would be from user preferences)
-  const setSelectedTeamId = useSetSelectedTeam();
-
-  useEffect(() => {
-    setSelectedTeamId("team-1");
-  }, [setSelectedTeamId]);
+  // We don't need to manually set a team ID anymore
+  // The useSelectedTeam hook will automatically handle team selection
+  // from the user's available teams
 
   const { isLoading, error } = useFiles();
   const filesByStatus = useFilesByStatus();
-  const { mutate: uploadFile, isPending: isUploading } = useFileUpload();
-
-  const handleUploadFile = () => {
-    // In a real app, this would open a file picker
-    console.log("Upload file");
-    // For demo purposes, we'll just upload a mock file
-    uploadFile({
-      name: `Meeting-${new Date().toISOString().split("T")[0]}.mp3`,
-      type: "audio/mp3",
-      size: 25000000,
-      // We don't need to specify teamId anymore since the backend will use the user's default team
-      // The API will automatically use the user's default team
-      uploadedBy: "user-1", // This would be the current user
-    });
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -107,8 +82,8 @@ export default function FilesPage() {
     }
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
+  const formatFileSize = (bytes: number | null | undefined) => {
+    if (!bytes || bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -130,14 +105,7 @@ export default function FilesPage() {
           <div className="flex justify-between items-center">
             <CardTitle>{t("Dashboard.files.title")}</CardTitle>
             <div className="flex space-x-2">
-              <Button
-                size="sm"
-                onClick={handleUploadFile}
-                disabled={isUploading}
-              >
-                <UploadCloud className="h-4 w-4 mr-2" />
-                {t("Dashboard.files.upload")}
-              </Button>
+              <AudioUploadButton />
             </div>
           </div>
         </CardHeader>
@@ -194,12 +162,12 @@ export default function FilesPage() {
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <File className="h-5 w-5 text-gray-500" />
-                      <span>{file.name}</span>
+                      <span>{file.fileName}</span>
                     </div>
                   </TableCell>
-                  <TableCell>{formatFileSize(file.size)}</TableCell>
+                  <TableCell>{formatFileSize(file.fileSize)}</TableCell>
                   <TableCell>
-                    {new Date(file.uploadedAt).toLocaleDateString()}
+                    {new Date(file.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm">

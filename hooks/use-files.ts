@@ -5,15 +5,17 @@ import { get, post } from "@/lib/fetch-client";
 // Типы для файлов
 export type FileStatus = "pending" | "processing" | "completed" | "error";
 
-export interface File {
+export interface FileData {
   id: string;
-  name: string;
-  type: string;
-  size: number;
-  uploadedAt: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  blobUrl: string;
   status: FileStatus;
-  uploadedBy: string;
+  userId: string;
   teamId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface FileUpload {
@@ -22,36 +24,44 @@ export interface FileUpload {
   size?: number;
   teamId?: string;
   uploadedBy?: string;
+  file?: File; // This is browser's File object
 }
 
 // Получение файлов из API
-const fetchFiles = async (teamId?: string): Promise<File[]> => {
-  if (!teamId) {
+const fetchFiles = async (teamId?: string): Promise<FileData[]> => {
+  // Не делаем запрос, если teamId пустой, "default" или undefined
+  if (!teamId || teamId === "" || teamId === "default") {
+    console.log("Skipping files fetch - invalid teamId:", teamId);
     return [];
   }
-  return get<File[]>("/api/files", { teamId });
+
+  try {
+    return await get<FileData[]>("/api/files", { teamId });
+  } catch (error) {
+    console.error("Error fetching files:", error);
+    // Возвращаем пустой массив при ошибке
+    return [];
+  }
 };
 
 // Загрузка файла в API
-const uploadFile = async (fileData: FileUpload): Promise<File> => {
+const uploadFile = async (fileData: FileUpload): Promise<FileData> => {
+  if (!fileData.file) {
+    throw new Error("No file provided");
+  }
+
   // We need to use FormData for file uploads
   const formData = new FormData();
 
-  // In a real implementation, this would be a real File object from an input
-  // For our mock implementation, we'll just create a text file
-  const mockFileContent = `This is a mock file for ${fileData.name}`;
-  const mockFile = new Blob([mockFileContent], {
-    type: fileData.type || "text/plain",
-  });
-
-  formData.append("file", mockFile, fileData.name);
+  // Use the actual file
+  formData.append("file", fileData.file);
 
   // Add teamId if provided
   if (fileData.teamId) {
     formData.append("teamId", fileData.teamId);
   }
 
-  // Make the request with FormData
+  // Make the request with FormData - Fix the API path
   return fetch("/api/files/upload", {
     method: "POST",
     body: formData,
@@ -71,7 +81,7 @@ export function useFiles() {
   return useQuery({
     queryKey: ["files", selectedTeamId],
     queryFn: () => fetchFiles(selectedTeamId),
-    enabled: !!selectedTeamId,
+    enabled: !!selectedTeamId && selectedTeamId !== "",
   });
 }
 
@@ -83,8 +93,10 @@ export function useFileUpload() {
   return useMutation({
     mutationFn: uploadFile,
     onSuccess: () => {
-      // Инвалидация запроса файлов для обновления списка
-      queryClient.invalidateQueries({ queryKey: ["files", selectedTeamId] });
+      // Инвалидация запроса файлов для обновления списка, только если есть валидный ID команды
+      if (selectedTeamId && selectedTeamId !== "") {
+        queryClient.invalidateQueries({ queryKey: ["files", selectedTeamId] });
+      }
     },
   });
 }

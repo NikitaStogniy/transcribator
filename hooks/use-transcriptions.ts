@@ -15,16 +15,26 @@ export interface Transcription {
 const fetchTranscriptions = async (
   teamId?: string
 ): Promise<Transcription[]> => {
-  const url = teamId
-    ? `/api/transcriptions?teamId=${teamId}`
-    : "/api/transcriptions";
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch transcriptions");
+  // Не делаем запрос, если teamId пустой, "default" или undefined
+  if (!teamId || teamId === "" || teamId === "default") {
+    console.log("Skipping transcriptions fetch - invalid teamId:", teamId);
+    return [];
   }
 
-  return response.json();
+  try {
+    const url = `/api/transcriptions?teamId=${teamId}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch transcriptions");
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("Error fetching transcriptions:", error);
+    // Возвращаем пустой массив при ошибке
+    return [];
+  }
 };
 
 // Получение одной транскрипции по ID
@@ -68,7 +78,7 @@ export function useTranscriptions() {
   return useQuery({
     queryKey: ["transcriptions", selectedTeamId],
     queryFn: () => fetchTranscriptions(selectedTeamId),
-    enabled: !!selectedTeamId,
+    enabled: !!selectedTeamId && selectedTeamId !== "",
   });
 }
 

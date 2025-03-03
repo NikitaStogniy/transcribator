@@ -15,6 +15,15 @@ export async function fetchClient(url: string, options: FetchOptions = {}) {
   // Add query parameters if provided
   let fullUrl = url;
   if (options.params) {
+    // Skip requests with invalid teamId parameter
+    if (options.params.teamId === "default" || options.params.teamId === "") {
+      console.log(
+        "Skipping API request with invalid teamId:",
+        options.params.teamId
+      );
+      throw new Error(`Invalid teamId: ${options.params.teamId}`);
+    }
+
     const searchParams = new URLSearchParams();
     Object.entries(options.params).forEach(([key, value]) => {
       if (value) searchParams.append(key, value);

@@ -5,6 +5,15 @@ import { useTranslations } from "next-intl";
 import { useSelectedTeam } from "@/hooks/use-selected-team";
 import { useTeam, TeamRole } from "@/hooks/use-team";
 import {
+  useTeamInvites,
+  useTeamInvitesByStatus,
+  useCreateTeamInvite,
+  useDeleteTeamInvite,
+  useResendTeamInvite,
+  TeamInvite,
+  InviteStatus,
+} from "@/hooks/use-team-invites";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -26,48 +35,18 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPlus, Mail, Copy, Check, X, Clock } from "lucide-react";
 
-// Interface for team invites
-interface TeamInvite {
-  id: string;
-  email: string;
-  role: TeamRole;
-  status: "pending" | "accepted" | "expired";
-  expiresAt: string;
-  createdAt: string;
-}
-
-// Mock data for team invites
-const mockInvites: TeamInvite[] = [
-  {
-    id: "inv-1",
-    email: "john.doe@example.com",
-    role: "editor",
-    status: "pending",
-    expiresAt: "2023-12-01T00:00:00Z",
-    createdAt: "2023-11-25T00:00:00Z",
-  },
-  {
-    id: "inv-2",
-    email: "jane.smith@example.com",
-    role: "viewer",
-    status: "accepted",
-    expiresAt: "2023-12-02T00:00:00Z",
-    createdAt: "2023-11-26T00:00:00Z",
-  },
-  {
-    id: "inv-3",
-    email: "alex.jones@example.com",
-    role: "admin",
-    status: "expired",
-    expiresAt: "2023-11-29T00:00:00Z",
-    createdAt: "2023-11-22T00:00:00Z",
-  },
-];
-
 export default function TeamInvitesPage() {
   const t = useTranslations();
   const { data: selectedTeamId } = useSelectedTeam();
   const { data: teamData } = useTeam();
+  const { data: allInvites = [] } = useTeamInvites();
+  const invitesByStatus = useTeamInvitesByStatus();
+  const { mutateAsync: createInvite, isPending: isCreating } =
+    useCreateTeamInvite();
+  const { mutateAsync: deleteInvite, isPending: isDeleting } =
+    useDeleteTeamInvite();
+  const { mutateAsync: resendInvite, isPending: isResending } =
+    useResendTeamInvite();
 
   const [email, setEmail] = useState("");
   const [selectedRole, setSelectedRole] = useState<TeamRole>("viewer");
@@ -75,25 +54,28 @@ export default function TeamInvitesPage() {
   const [copied, setCopied] = useState(false);
 
   // Filter invites by status
-  const pendingInvites = mockInvites.filter(
-    (invite) => invite.status === "pending"
-  );
-  const acceptedInvites = mockInvites.filter(
-    (invite) => invite.status === "accepted"
-  );
-  const expiredInvites = mockInvites.filter(
-    (invite) => invite.status === "expired"
-  );
+  const pendingInvites = invitesByStatus.pending;
+  const acceptedInvites = invitesByStatus.accepted;
+  const expiredInvites = invitesByStatus.expired;
 
-  const handleCreateInvite = () => {
-    // In a real app, this would send a request to create an invite
-    console.log(`Creating invite for ${email} with role ${selectedRole}`);
+  const handleCreateInvite = async () => {
+    if (!selectedTeamId || !email || !selectedRole) return;
 
-    // Generate a mock invite link
-    const link = `https://app.transcribator.com/invite/${Math.random()
-      .toString(36)
-      .substring(2, 15)}`;
-    setInviteLink(link);
+    try {
+      const result = await createInvite({
+        teamId: selectedTeamId,
+        email,
+        role: selectedRole,
+      });
+
+      // Set the invite link from the API response
+      setInviteLink(result.inviteLink);
+
+      // Reset the form
+      setEmail("");
+    } catch (error) {
+      console.error("Error creating invite:", error);
+    }
   };
 
   const handleCopyLink = () => {
@@ -102,14 +84,21 @@ export default function TeamInvitesPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDeleteInvite = (id: string) => {
-    // In a real app, this would send a request to delete the invite
-    console.log(`Deleting invite ${id}`);
+  const handleDeleteInvite = async (id: string) => {
+    try {
+      await deleteInvite(id);
+    } catch (error) {
+      console.error("Error deleting invite:", error);
+    }
   };
 
-  const handleResendInvite = (id: string) => {
-    // In a real app, this would send a request to resend the invite
-    console.log(`Resending invite ${id}`);
+  const handleResendInvite = async (id: string) => {
+    try {
+      const result = await resendInvite(id);
+      setInviteLink(result.inviteLink);
+    } catch (error) {
+      console.error("Error resending invite:", error);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -129,7 +118,7 @@ export default function TeamInvitesPage() {
     }
   };
 
-  const getStatusBadgeVariant = (status: TeamInvite["status"]) => {
+  const getStatusBadgeVariant = (status: InviteStatus) => {
     switch (status) {
       case "pending":
         return "secondary";
@@ -142,7 +131,7 @@ export default function TeamInvitesPage() {
     }
   };
 
-  const getStatusIcon = (status: TeamInvite["status"]) => {
+  const getStatusIcon = (status: InviteStatus) => {
     switch (status) {
       case "pending":
         return <Clock className="h-4 w-4" />;
@@ -288,59 +277,57 @@ export default function TeamInvitesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockInvites
-                      .filter((invite) => invite.status === status)
-                      .map((invite) => (
-                        <TableRow key={invite.id}>
-                          <TableCell>{invite.email}</TableCell>
-                          <TableCell>
+                    {invitesByStatus[
+                      status as keyof typeof invitesByStatus
+                    ].map((invite) => (
+                      <TableRow key={invite.id}>
+                        <TableCell>{invite.email}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={getRoleBadgeVariant(invite.role)}
+                            className="capitalize"
+                          >
+                            {t(`Dashboard.team.${invite.role.toLowerCase()}s`)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center">
+                            {getStatusIcon(invite.status)}
                             <Badge
-                              variant={getRoleBadgeVariant(invite.role)}
-                              className="capitalize"
+                              variant={getStatusBadgeVariant(invite.status)}
+                              className="ml-2 capitalize"
                             >
-                              {t(
-                                `Dashboard.team.${invite.role.toLowerCase()}s`
-                              )}
+                              {t(`Dashboard.team.${invite.status}`)}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              {getStatusIcon(invite.status)}
-                              <Badge
-                                variant={getStatusBadgeVariant(invite.status)}
-                                className="ml-2 capitalize"
-                              >
-                                {t(`Dashboard.team.${invite.status}`)}
-                              </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell>{formatDate(invite.createdAt)}</TableCell>
-                          <TableCell>{formatDate(invite.expiresAt)}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              {invite.status === "pending" && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleResendInvite(invite.id)}
-                                >
-                                  <Mail className="h-4 w-4" />
-                                  {t("Dashboard.team.resend")}
-                                </Button>
-                              )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatDate(invite.createdAt)}</TableCell>
+                        <TableCell>{formatDate(invite.expiresAt)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            {invite.status === "pending" && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteInvite(invite.id)}
+                                onClick={() => handleResendInvite(invite.id)}
                               >
-                                <X className="h-4 w-4" />
-                                {t("Dashboard.team.delete")}
+                                <Mail className="h-4 w-4" />
+                                {t("Dashboard.team.resend")}
                               </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    {mockInvites.filter((invite) => invite.status === status)
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteInvite(invite.id)}
+                            >
+                              <X className="h-4 w-4" />
+                              {t("Dashboard.team.delete")}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {invitesByStatus[status as keyof typeof invitesByStatus]
                       .length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-10">

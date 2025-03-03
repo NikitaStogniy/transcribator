@@ -36,6 +36,12 @@ export async function GET(request: Request) {
       );
     }
 
+    // Reject requests with invalid teamId
+    if (teamId === "default" || teamId === "") {
+      console.log("API /files: Invalid team ID:", teamId);
+      return NextResponse.json({ error: "Invalid team ID" }, { status: 400 });
+    }
+
     // Check if user is member of the team
     const teamMember = await prisma.teamMember.findFirst({
       where: {
@@ -57,7 +63,7 @@ export async function GET(request: Request) {
         teamId,
       },
       orderBy: {
-        uploadedAt: "desc",
+        updatedAt: "desc",
       },
     });
 

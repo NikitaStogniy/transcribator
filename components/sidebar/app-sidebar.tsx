@@ -4,15 +4,12 @@ import * as React from "react";
 import {
   AudioWaveform,
   Command,
-  Frame,
   FilesIcon,
   GalleryVerticalEnd,
-  Map,
-  PieChart,
   Settings2,
-  SquareTerminal,
   Users,
   FileTextIcon,
+  Building2,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { NavMain } from "@/components/sidebar/nav-main";
@@ -25,6 +22,8 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { useTeam } from "@/hooks/use-team";
+import { useSession } from "@/hooks/use-session";
 
 // This is sample data.
 const generateNavItems = (t: (key: string) => string) => [
@@ -86,71 +85,64 @@ const generateNavItems = (t: (key: string) => string) => [
       },
     ],
   },
-  {
-    title: t("Navigation.settings"),
-    url: "/dashboard/settings",
-    icon: Settings2,
-    items: [
-      {
-        title: t("Dashboard.settings.general"),
-        url: "/dashboard/settings",
-      },
-      {
-        title: t("Dashboard.settings.team"),
-        url: "/dashboard/settings/team",
-      },
-      {
-        title: t("Dashboard.settings.billing"),
-        url: "/dashboard/settings/billing",
-      },
-      {
-        title: t("Dashboard.settings.api"),
-        url: "/dashboard/settings/api",
-      },
-    ],
-  },
 ];
-
-// This is sample data.
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
-};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const t = useTranslations();
   const navMain = generateNavItems(t);
+  const { data: teamData } = useTeam();
+  const { data: sessionData, isLoading } = useSession();
+
+  // Transform the team data to include logos and plans
+  const teams = React.useMemo(() => {
+    // Если данные о команде недоступны или нет объекта team,
+    // возвращаем массив с дефолтной командой
+    if (!teamData?.team) {
+      return [
+        {
+          id: "default",
+          name: "Моя команда",
+          logo: Building2,
+          plan: "Бесплатно",
+        },
+      ];
+    }
+
+    // Create a team entry with the current team
+    const currentTeam = {
+      id: teamData.team.id,
+      name: teamData.team.name,
+      logo: Building2,
+      plan: "Team", // Default plan if not available
+    };
+
+    return [currentTeam];
+  }, [teamData]);
+
+  if (isLoading) {
+    return null; // or a loading spinner
+  }
+
+  if (!sessionData?.authenticated) {
+    return null; // or redirect to login
+  }
+
+  const user = {
+    name: sessionData.userName || "Guest",
+    email: sessionData.userEmail || "",
+    avatar: "", // You might want to add avatar to your session data
+  };
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher teams={teams} />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter className="flex flex-col gap-4">
-        <NavUser user={data.user} />
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

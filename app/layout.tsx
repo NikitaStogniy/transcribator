@@ -4,6 +4,7 @@ import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { TailwindIndicator } from "@/components/tailwind-indicator";
+import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
 const inter = Inter({
@@ -50,6 +51,7 @@ export default function RootLayout({
               <div className="flex-1">{children}</div>
             </div>
             <TailwindIndicator />
+            <Toaster />
           </ThemeProvider>
         </QueryProvider>
       </body>

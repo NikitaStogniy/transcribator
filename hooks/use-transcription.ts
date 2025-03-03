@@ -4,11 +4,12 @@ import { useTeamSelection } from "./use-team-selection";
 export interface Transcription {
   id: string;
   fileId: string;
-  content: string;
-  status: "pending" | "completed" | "error";
+  content: any; // Using any since the content structure can vary
+  status: "pending" | "processing" | "completed" | "error";
   createdAt: string;
   updatedAt: string;
   teamId: string;
+  fileName?: string;
 }
 
 // Fetch transcription for a file
@@ -50,9 +51,15 @@ export function useTranscription(fileId: string) {
     enabled: !!fileId,
     // Polling for transcription status updates
     refetchInterval: (query) => {
-      if (query.state.data?.status === "pending") {
+      // If the status is pending or processing, poll every 5 seconds
+      const status = query.state.data?.status;
+      if (status === "pending" || status === "processing") {
+        console.log(
+          `Polling transcription status for file ${fileId}, current status: ${status}`
+        );
         return 5000;
       }
+      // Otherwise stop polling
       return false;
     },
   });
@@ -64,10 +71,18 @@ export function useRequestTranscription() {
   const { selectedTeamId } = useTeamSelection();
 
   return useMutation({
-    mutationFn: (fileId: string) =>
-      requestTranscription(fileId, selectedTeamId),
+    mutationFn: (fileId: string) => {
+      if (!selectedTeamId) {
+        throw new Error("No team selected");
+      }
+      return requestTranscription(fileId, selectedTeamId);
+    },
     onSuccess: (data) => {
       queryClient.setQueryData(["transcription", data.fileId], data);
+      // Immediately start polling by invalidating the query
+      queryClient.invalidateQueries({
+        queryKey: ["transcription", data.fileId],
+      });
     },
   });
 }

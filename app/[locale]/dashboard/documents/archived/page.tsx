@@ -14,7 +14,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useSetSelectedTeam } from "@/hooks/use-selected-team";
+import { useSetSelectedTeam, useUserTeams } from "@/hooks/use-selected-team";
 import { useDocuments } from "@/hooks/use-documents";
 
 export default function DocumentsArchivePage() {
@@ -22,10 +22,15 @@ export default function DocumentsArchivePage() {
 
   // Set a default selected team ID
   const setSelectedTeamId = useSetSelectedTeam();
+  const { data: userTeamsData } = useUserTeams();
 
   useEffect(() => {
-    setSelectedTeamId("team-1");
-  }, [setSelectedTeamId]);
+    // Only set a team if we have teams data and there's at least one team
+    if (userTeamsData?.teams && userTeamsData.teams.length > 0) {
+      // Use the first available team
+      setSelectedTeamId(userTeamsData.teams[0].id);
+    }
+  }, [setSelectedTeamId, userTeamsData]);
 
   const { isLoading, error, data: documents = [] } = useDocuments();
 

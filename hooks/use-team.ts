@@ -39,10 +39,19 @@ export interface NewTeamMember {
 
 // Получение данных команды из API
 const fetchTeamData = async (teamId?: string): Promise<TeamResponse> => {
-  if (!teamId) {
+  // Не делаем запрос, если teamId пустой, "default" или undefined
+  if (!teamId || teamId === "" || teamId === "default") {
+    console.log("Skipping team fetch - invalid teamId:", teamId);
     return { members: [] };
   }
-  return get<TeamResponse>("/api/team", { teamId });
+
+  try {
+    return await get<TeamResponse>("/api/team", { teamId });
+  } catch (error) {
+    console.error("Failed to fetch team data:", error);
+    // Возвращаем пустой объект в случае ошибки
+    return { members: [] };
+  }
 };
 
 // Добавление нового члена команды
@@ -59,7 +68,14 @@ export function useTeam() {
   return useQuery({
     queryKey: ["team", selectedTeamId],
     queryFn: () => fetchTeamData(selectedTeamId),
-    enabled: !!selectedTeamId,
+    // Включаем запрос только если есть валидный ID команды (не undefined, не пустая строка)
+    enabled: !!selectedTeamId && selectedTeamId !== "",
+    // Не считаем ошибку 403 как фатальную
+    retry: (failureCount, error: any) => {
+      // Повторяем запрос максимум 1 раз, и не повторяем для 403 ошибок
+      if (error?.status === 403) return false;
+      return failureCount < 1;
+    },
   });
 }
 

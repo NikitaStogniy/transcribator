@@ -29,16 +29,11 @@ import {
   FilePlus,
 } from "lucide-react";
 import { Table, TableHeader, TableRow, TableHead } from "@/components/ui/table";
+import { useTeamSelection } from "@/hooks/use-team-selection";
 
 export default function DocumentsPage() {
   const t = useTranslations();
-
-  // Set a default selected team ID (in a real app, this would be from user preferences)
-  const setSelectedTeamId = useSetSelectedTeam();
-
-  useEffect(() => {
-    setSelectedTeamId("team-1");
-  }, [setSelectedTeamId]);
+  const { selectedTeamId } = useTeamSelection();
 
   const { isLoading, error } = useDocuments();
   const sortedDocuments = useDocumentsSortedByDate();
@@ -51,7 +46,7 @@ export default function DocumentsPage() {
     createDocument({
       title: `Meeting Summary - ${new Date().toLocaleDateString()}`,
       fileId: "file-1", // This would be selected by the user
-      teamId: "team-1", // This would be the selected team
+      teamId: selectedTeamId as string, // Use the currently selected team ID
       createdBy: "user-1", // This would be the current user
       summary: "This is a sample meeting summary created from the UI.",
     });

@@ -29,16 +29,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PlusCircle, UserPlus, Check, X } from "lucide-react";
+import { useSelectedTeam } from "@/hooks/use-selected-team";
 
 export default function TeamPage() {
   const t = useTranslations();
 
-  // Set a default selected team ID (in a real app, this would be from user preferences)
+  // Get the selected team ID instead of setting a hardcoded value
+  const { data: selectedTeamId } = useSelectedTeam();
   const setSelectedTeamId = useSetSelectedTeam();
-
-  useEffect(() => {
-    setSelectedTeamId("team-1");
-  }, [setSelectedTeamId]);
 
   const { data, isLoading, error } = useTeam();
   const membersByRole = useTeamMembersByRole();
@@ -47,14 +45,20 @@ export default function TeamPage() {
   const handleAddMember = (role: "admin" | "editor" | "viewer") => {
     // In a real app, this would open a modal to select a user and set their role
     console.log(`Add member with role: ${role}`);
+
     // For demo purposes, we'll just add a mock user
-    addMember({
-      userId: "user-6", // This would be selected by the user
-      name: "New Team Member",
-      email: "new.member@example.com",
-      role: role,
-      teamId: "team-1", // This would be the selected team
-    });
+    // Use the dynamically selected team ID instead of hardcoding it
+    if (selectedTeamId) {
+      addMember({
+        userId: "user-6", // This would be selected by the user
+        name: "New Team Member",
+        email: "new.member@example.com",
+        role: role,
+        teamId: selectedTeamId, // Use the selected team ID from the hook
+      });
+    } else {
+      console.error("No team selected");
+    }
   };
 
   const getRoleBadgeColor = (role: string) => {

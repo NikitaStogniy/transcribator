@@ -20,6 +20,20 @@
     "files": {
       "title": "Files",
       "upload": "Upload File",
+      "uploadAudio": "Upload Audio",
+      "audioUpload": {
+        "title": "Upload Audio File",
+        "description": "Upload an audio file for transcription. Supported formats: MP3, WAV, M4A.",
+        "dragDrop": "Drag & drop your audio file here",
+        "browse": "Or click to browse your files",
+        "uploadButton": "Upload Audio",
+        "uploading": "Uploading...",
+        "success": "Upload successful",
+        "successDetail": "Your audio file has been uploaded and is being processed.",
+        "error": "Upload error",
+        "errorDetail": "An error occurred while uploading your file. Please try again.",
+        "teamRequired": "Please select a file and ensure you're in a team."
+      },
       "status": "Status",
       "name": "Name",
       "size": "Size",
@@ -55,6 +69,11 @@
       "permissions": "Permissions",
       "invites": "Invites",
       "loading": "Loading team data...",
+      "switcher": {
+        "teams": "Teams",
+        "addTeam": "Add team (coming soon)",
+        "loadingTeams": "Loading teams..."
+      },
       "createInvite": "Create Invite",
       "createInviteDescription": "Invite new members to your team by email",
       "inviteLink": "Invite link - share this with your team member",
@@ -211,6 +230,41 @@
       "submit": "Login",
       "noAccount": "Don't have an account?",
       "register": "Register"
+    }
+  },
+  "landing": {
+    "hero": {
+      "title": "Transform Your Meetings into Actionable Knowledge",
+      "subtitle": "Advanced AI-powered transcription service designed for modern teams",
+      "cta": "Start Transcribing"
+    },
+    "features": {
+      "title": "Why Choose Transcribator",
+      "card1": {
+        "title": "Team Workspace",
+        "description": "Collaborate seamlessly with role-based access control and shared knowledge base"
+      },
+      "card2": {
+        "title": "Unlimited Transcription",
+        "description": "Transcribe audio files of any length with high accuracy and fast processing"
+      },
+      "card3": {
+        "title": "Pay Per Minute",
+        "description": "Transparent pricing based on actual usage - only pay for what you transcribe"
+      },
+      "card4": {
+        "title": "Smart Documents",
+        "description": "Automatically generate structured documents with key points, action items, and decisions"
+      },
+      "card5": {
+        "title": "AI Assistant",
+        "description": "Chat with AI about your meetings and search through your entire knowledge base"
+      }
+    },
+    "cta": {
+      "title": "Ready to Transform Your Meetings?",
+      "description": "Start with 60 minutes free transcription - no credit card required",
+      "button": "Try for Free"
     }
   }
 }

@@ -16,16 +16,17 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSetSelectedTeam } from "@/hooks/use-selected-team";
 import { useDocuments } from "@/hooks/use-documents";
+import { useTeamSelection } from "@/hooks/use-team-selection";
 
 export default function DocumentsSharedPage() {
   const t = useTranslations();
 
-  // Set a default selected team ID
+  // Use team selection hooks
+  const { selectedTeamId } = useTeamSelection();
   const setSelectedTeamId = useSetSelectedTeam();
 
-  useEffect(() => {
-    setSelectedTeamId("team-1");
-  }, [setSelectedTeamId]);
+  // No need to set a hardcoded team ID, the useTeamSelection hook
+  // automatically selects the first available team if none is selected
 
   const { isLoading, error, data: documents = [] } = useDocuments();
 

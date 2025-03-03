@@ -1,14 +1,29 @@
 /**
- * Assembly AI integration for transcription
+ * Assembly AI integration for transcription using the official SDK
  */
+import { AssemblyAI } from "assemblyai";
 
-// API key from environment variables
-const API_KEY = process.env.ASSEMBLY_API_KEY;
-const BASE_URL = "https://api.assemblyai.com/v2";
+// Helper function for consistent logging
+function logInfo(operation: string, message: string, data?: any) {
+  const logMessage = `[ASSEMBLY:${operation}] ${message}`;
+  console.log(logMessage, data ? data : "");
+}
 
-// Types for Assembly AI API
+function logError(operation: string, message: string, error: any) {
+  const logMessage = `[ASSEMBLY:${operation}:ERROR] ${message}`;
+  console.error(logMessage, error);
+}
+
+// Initialize the client with API key
+const client = new AssemblyAI({
+  apiKey: process.env.ASSEMBLY_API_KEY as string,
+});
+
+logInfo("INIT", "AssemblyAI client initialized");
+
+// Types for Assembly AI API responses
 export type TranscriptionParams = {
-  audio_url: string;
+  audio_url?: string;
   language_code?: string;
   speaker_labels?: boolean;
   punctuate?: boolean;
@@ -42,31 +57,31 @@ export type TranscriptionResult = {
 
 // Upload a file to Assembly AI
 export async function uploadToAssemblyAI(audioFile: File): Promise<string> {
+  const operationId = `upload_${Date.now()}`;
   try {
-    // Convert file to arrayBuffer
+    logInfo(
+      "UPLOAD",
+      `Starting upload operation ${operationId} for file ${audioFile.name} (${audioFile.size} bytes)`
+    );
+
+    // Convert file to buffer
+    logInfo("UPLOAD", `Converting file to buffer`);
     const arrayBuffer = await audioFile.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
+    const buffer = Buffer.from(arrayBuffer);
+    logInfo("UPLOAD", `File converted to buffer (${buffer.length} bytes)`);
 
-    // Upload to AssemblyAI
-    const response = await fetch(`${BASE_URL}/upload`, {
-      method: "POST",
-      headers: {
-        authorization: API_KEY as string,
-        "Content-Type": "application/octet-stream",
-      },
-      body: buffer,
-    });
+    // Upload to AssemblyAI using the SDK
+    logInfo("UPLOAD", `Sending file to AssemblyAI API`);
+    const uploadUrl = await client.files.upload(buffer);
+    logInfo("UPLOAD", `Upload successful, received URL: ${uploadUrl}`);
 
-    if (!response.ok) {
-      throw new Error(
-        `Upload failed: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const data = await response.json();
-    return data.upload_url;
+    return uploadUrl;
   } catch (error) {
-    console.error("Error uploading to AssemblyAI:", error);
+    logError(
+      "UPLOAD",
+      `Failed to upload file ${audioFile.name} (operation ${operationId})`,
+      error
+    );
     throw new Error("Failed to upload audio file for transcription");
   }
 }
@@ -76,32 +91,42 @@ export async function startTranscription(
   audioUrl: string,
   params: Partial<TranscriptionParams> = {}
 ): Promise<string> {
+  const operationId = `transcribe_${Date.now()}`;
   try {
-    const response = await fetch(`${BASE_URL}/transcript`, {
-      method: "POST",
-      headers: {
-        authorization: API_KEY as string,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        audio_url: audioUrl,
-        speaker_labels: true,
-        punctuate: true,
-        format_text: true,
-        ...params,
-      }),
+    logInfo(
+      "TRANSCRIBE",
+      `Starting transcription operation ${operationId} for URL: ${audioUrl}`
+    );
+    logInfo("TRANSCRIBE", `Transcription parameters:`, {
+      speaker_labels: params.speaker_labels ?? true,
+      punctuate: params.punctuate ?? true,
+      format_text: params.format_text ?? true,
+      language_code: params.language_code,
     });
 
-    if (!response.ok) {
-      throw new Error(
-        `Transcription request failed: ${response.status} ${response.statusText}`
-      );
-    }
+    // Submit transcription job with the SDK
+    logInfo("TRANSCRIBE", `Submitting transcription job to AssemblyAI`);
+    const transcript = await client.transcripts.submit({
+      audio: audioUrl,
+      speaker_labels: params.speaker_labels ?? true,
+      punctuate: params.punctuate ?? true,
+      format_text: params.format_text ?? true,
+      language_code: params.language_code,
+    });
 
-    const data = await response.json();
-    return data.id;
+    logInfo(
+      "TRANSCRIBE",
+      `Transcription job submitted successfully with ID: ${transcript.id}`
+    );
+    logInfo("TRANSCRIBE", `Initial status: ${transcript.status}`);
+
+    return transcript.id;
   } catch (error) {
-    console.error("Error starting transcription:", error);
+    logError(
+      "TRANSCRIBE",
+      `Failed to start transcription for URL: ${audioUrl} (operation ${operationId})`,
+      error
+    );
     throw new Error("Failed to start transcription process");
   }
 }
@@ -111,21 +136,38 @@ export async function getTranscriptionStatus(
   transcriptionId: string
 ): Promise<TranscriptionResult> {
   try {
-    const response = await fetch(`${BASE_URL}/transcript/${transcriptionId}`, {
-      headers: {
-        authorization: API_KEY as string,
-      },
-    });
+    logInfo("STATUS", `Checking status for transcription: ${transcriptionId}`);
 
-    if (!response.ok) {
-      throw new Error(
-        `Failed to get transcription status: ${response.status} ${response.statusText}`
+    const transcript = await client.transcripts.get(transcriptionId);
+
+    logInfo(
+      "STATUS",
+      `Retrieved status for transcription ${transcriptionId}: ${transcript.status}`
+    );
+    if (transcript.status === "completed") {
+      logInfo(
+        "STATUS",
+        `Transcription ${transcriptionId} completed successfully`
+      );
+      logInfo(
+        "STATUS",
+        `Text length: ${transcript.text?.length || 0} characters`
+      );
+    } else if (transcript.status === "error") {
+      logError(
+        "STATUS",
+        `Transcription ${transcriptionId} failed with error`,
+        transcript.error
       );
     }
 
-    return await response.json();
+    return transcript as unknown as TranscriptionResult;
   } catch (error) {
-    console.error("Error getting transcription status:", error);
+    logError(
+      "STATUS",
+      `Error fetching status for transcription ${transcriptionId}`,
+      error
+    );
     throw new Error("Failed to get transcription status");
   }
 }

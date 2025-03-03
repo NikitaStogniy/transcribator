@@ -28,7 +28,9 @@ const fetchDocuments = async (
   teamId?: string,
   fileId?: string
 ): Promise<Document[]> => {
-  if (!teamId) {
+  // Не делаем запрос, если teamId пустой, "default" или undefined
+  if (!teamId || teamId === "" || teamId === "default") {
+    console.log("Skipping documents fetch - invalid teamId:", teamId);
     return [];
   }
 
@@ -37,7 +39,13 @@ const fetchDocuments = async (
     params.fileId = fileId;
   }
 
-  return get<Document[]>("/api/documents", params);
+  try {
+    return await get<Document[]>("/api/documents", params);
+  } catch (error) {
+    console.error("Error fetching documents:", error);
+    // Возвращаем пустой массив при ошибке
+    return [];
+  }
 };
 
 // Create a new document
@@ -52,7 +60,7 @@ export function useDocuments(fileId?: string) {
   return useQuery({
     queryKey: ["documents", selectedTeamId, fileId],
     queryFn: () => fetchDocuments(selectedTeamId, fileId),
-    enabled: !!selectedTeamId,
+    enabled: !!selectedTeamId && selectedTeamId !== "",
   });
 }
 

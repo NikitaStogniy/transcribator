@@ -8,6 +8,9 @@ import {
   Globe,
   LogOut,
   Sparkles,
+  Settings2,
+  Code2,
+  Users2,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -108,35 +111,40 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Sparkles />
-                {t("upgradeToPro")}
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard/settings")}
+              >
+                <Settings2 className="mr-2 h-4 w-4" />
+                {t("settings")}
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard/settings/billing")}
+              >
+                <CreditCard className="mr-2 h-4 w-4" />
+                {t("billing")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheck />
+              <DropdownMenuItem disabled>
+                <BadgeCheck className="mr-2 h-4 w-4" />
                 {t("account")}
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCard />
-                {t("billing")}
               </DropdownMenuItem>
               <LanguageSwitcher>
                 <DropdownMenuItem>
-                  <Globe />
+                  <Globe className="mr-2 h-4 w-4" />
                   {t("language")}
                 </DropdownMenuItem>
               </LanguageSwitcher>
-              <DropdownMenuItem>
-                <Bell />
+              <DropdownMenuItem disabled>
+                <Bell className="mr-2 h-4 w-4" />
                 {t("notifications")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
-              <LogOut />
+              <LogOut className="mr-2 h-4 w-4" />
               {t("logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>

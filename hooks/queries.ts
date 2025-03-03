@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { get } from "@/lib/fetch-client";
 
 interface UserData {
   name: string;
@@ -8,14 +9,8 @@ interface UserData {
 
 // Функция для получения данных пользователя по API
 const fetchUserDetails = async (userId: string): Promise<UserData> => {
-  // Здесь должен быть реальный API запрос
-  // Для примера возвращаем моковые данные
-  // TODO: Заменить на реальный API-запрос
-  return {
-    name: "John Doe",
-    email: "john@example.com",
-    image: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + userId,
-  };
+  const response = await get<UserData>(`/api/users/${userId}`);
+  return response;
 };
 
 // Хук React Query для получения данных пользователя

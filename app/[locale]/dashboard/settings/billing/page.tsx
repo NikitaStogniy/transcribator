@@ -23,7 +23,7 @@ export default function BillingSettings() {
   const t = useTranslations("Dashboard.settings");
 
   return (
-    <div className="container mx-auto py-6 space-y-8">
+    <div className="container w-full space-y-6 p-4">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">{t("billing")}</h1>
         <Button>
